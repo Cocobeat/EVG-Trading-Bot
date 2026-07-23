@@ -9,7 +9,7 @@ MODALITA':
 - Se le variabili KRAKEN_API_KEY / KRAKEN_API_SECRET non sono impostate:
   il bot funziona in modalita' SOLO SEGNALE (nessun ordine, solo notifiche
   Telegram). Utile per osservare la strategia prima di rischiare soldi veri.
-- Se sono impostate e CONFIG["KRAKEN_DRY_RUN"] = True (default):
+- Se sono impostate e CONFIG["KRAKEN_DRY_RUN"] = True:
   il bot chiede a Kraken di VALIDARE l'ordine (parametro 'validate') senza
   eseguirlo davvero. Nessun soldo si muove, ma verifichi che tutto il
   collegamento funzioni.
@@ -17,10 +17,24 @@ MODALITA':
   Soldi reali si muovono. Passa a questa modalita' solo dopo aver testato
   a lungo le altre due.
 
+STRATEGIA (v2 - con trend filter e trailing stop):
+- Ingresso: RSI(14) che risale sopra 35 da sotto (rimbalzo da ipervenduto),
+  SOLO se il prezzo e' sopra la media mobile a 50 periodi (TREND_SMA_PERIOD):
+  evita di comprare rimbalzi in monete che sono in un trend discendente di
+  fondo ("catching a falling knife").
+- Uscita:
+  * Stop loss dinamico: proporzionale alla volatilita' della moneta al
+    momento dell'ingresso (non piu' una percentuale fissa uguale per tutte).
+  * Trailing stop: una volta raggiunto un profitto minimo (TRAIL_ARM_PROFIT_PCT),
+    il bot smette di avere un target fisso e lascia correre il prezzo,
+    vendendo solo se scende di una certa percentuale dal massimo toccato.
+    Questo evita di tagliare i trend forti troppo presto.
+  * RSI in ipercomprato (>= 70) come uscita di sicurezza aggiuntiva.
+
 SICUREZZA:
 - La chiave API Kraken deve avere SOLO i permessi "Query Funds" e
   "Create & Modify Orders". MAI il permesso "Withdraw Funds".
-- E' presente un kill-switch: se la perdita cumulata (stimata) supera
+- Kill-switch: se la perdita cumulata (stimata) supera
   CONFIG["MAX_TOTAL_LOSS_EUR"], il bot si mette in pausa automaticamente
   e smette di aprire nuove posizioni finche' non lo riattivi tu a mano
   (vedi GUIDA.md).
@@ -47,12 +61,24 @@ import requests
 CONFIG = {
     "QUOTE_CURRENCY": "EUR",
     "TIMEFRAME_MINUTES": 60,        # candele orarie
-    "LOOKBACK_CANDLES": 60,         # candele scaricate per calcolare gli indicatori
+    "LOOKBACK_CANDLES": 90,         # candele scaricate (deve coprire almeno TREND_SMA_PERIOD)
     "RSI_PERIOD": 14,
     "RSI_BUY_THRESHOLD": 35.0,      # segnale di acquisto: RSI risale sopra questa soglia
-    "RSI_SELL_THRESHOLD": 70.0,     # segnale di vendita per ipercomprato
-    "TAKE_PROFIT_PCT": 8.0,         # vendita a +8% dal prezzo di ingresso
-    "STOP_LOSS_PCT": -5.0,          # vendita a -5% dal prezzo di ingresso
+    "RSI_SELL_THRESHOLD": 70.0,     # uscita di sicurezza per ipercomprato
+
+    # ---- Filtro di trend (evita di comprare in un downtrend di fondo) ----
+    "TREND_SMA_PERIOD": 50,         # media mobile (candele orarie) usata come filtro di trend
+    "TREND_FILTER_ENABLED": True,   # compra solo se il prezzo e' sopra questa media mobile
+
+    # ---- Uscita: stop loss dinamico + trailing stop (invece di TP/SL fissi) ----
+    "STOP_LOSS_ATR_MULT": 1.5,      # stop loss = volatilita' della moneta * questo moltiplicatore
+    "MIN_STOP_LOSS_PCT": 3.0,       # ma non scendere mai sotto questa percentuale...
+    "MAX_STOP_LOSS_PCT": 10.0,      # ...ne' salire mai sopra questa
+    "TRAIL_ARM_PROFIT_PCT": 3.0,    # il trailing stop si attiva solo dopo questo guadagno minimo
+    "TRAIL_ATR_MULT": 2.0,          # distanza del trailing stop dal massimo = volatilita' * moltiplicatore
+    "MIN_TRAIL_PCT": 4.0,
+    "MAX_TRAIL_PCT": 15.0,
+
     "MIN_MARKET_CAP_RANK": 30,      # esclude le prime 30 monete per market cap (BTC, ETH, ecc.)
     "MAX_MARKET_CAP_RANK": 250,     # esclude micro-cap troppo illiquide/rischiose
     "MAX_24H_CHANGE_PCT": 20.0,     # scarta monete gia' salite troppo nelle ultime 24h
@@ -63,7 +89,8 @@ CONFIG = {
 
     # ---- Esecuzione ordini reali ----
     "EUR_PER_TRADE": 30.0,          # quanti euro investire per ogni segnale di acquisto
-    "KRAKEN_DRY_RUN": False,         # True = valida l'ordine senza eseguirlo. Metti False solo quando sei sicuro.
+    "KRAKEN_DRY_RUN": False,         # True = valida l'ordine senza eseguirlo. Rimesso a True apposta:
+                                     # testa la nuova strategia prima di tornare a False (vedi GUIDA.md).
     "MAX_TOTAL_LOSS_EUR": 30.0,     # kill-switch: perdita cumulata oltre la quale il bot si ferma da solo
 }
 
@@ -272,6 +299,17 @@ def compute_volatility_pct(closes):
     return math.sqrt(variance)
 
 
+def compute_sma(closes, period):
+    """Media mobile semplice sugli ultimi 'period' valori di chiusura."""
+    if len(closes) < period:
+        return None
+    return sum(closes[-period:]) / period
+
+
+def clamp(value, min_value, max_value):
+    return max(min_value, min(value, max_value))
+
+
 def build_candidate_universe(kraken_pairs, market_data):
     candidates = []
     for pair_name, info in kraken_pairs.items():
@@ -323,16 +361,40 @@ def check_sell_signals(open_positions, state):
         current_price = closes[-1]
         entry_price = pos["entry_price"]
         change_pct = (current_price - entry_price) / entry_price * 100
+
+        # aggiorna il massimo storico raggiunto da quando e' aperta la posizione
+        pos["highest_price"] = max(pos.get("highest_price", entry_price), current_price)
+        highest_price = pos["highest_price"]
+
+        entry_volatility = pos.get("volatility_pct", CONFIG["MIN_VOLATILITY_PCT"])
+        stop_loss_price = pos.get(
+            "stop_loss_price",
+            entry_price * (1 - CONFIG["MIN_STOP_LOSS_PCT"] / 100),
+        )
+
         rsis = compute_rsi(closes, CONFIG["RSI_PERIOD"])
         current_rsi = rsis[-1] if rsis else None
 
         reason = None
-        if change_pct >= CONFIG["TAKE_PROFIT_PCT"]:
-            reason = f"Take profit raggiunto ({change_pct:+.2f}%)"
-        elif change_pct <= CONFIG["STOP_LOSS_PCT"]:
-            reason = f"Stop loss raggiunto ({change_pct:+.2f}%)"
-        elif current_rsi is not None and current_rsi >= CONFIG["RSI_SELL_THRESHOLD"]:
-            reason = f"RSI in ipercomprato ({current_rsi:.1f})"
+
+        if current_price <= stop_loss_price:
+            reason = f"Stop loss dinamico raggiunto ({change_pct:+.2f}%)"
+        else:
+            profit_from_entry_pct = (highest_price - entry_price) / entry_price * 100
+            if profit_from_entry_pct >= CONFIG["TRAIL_ARM_PROFIT_PCT"]:
+                trail_pct = clamp(
+                    entry_volatility * CONFIG["TRAIL_ATR_MULT"],
+                    CONFIG["MIN_TRAIL_PCT"],
+                    CONFIG["MAX_TRAIL_PCT"],
+                )
+                trailing_stop_price = highest_price * (1 - trail_pct / 100)
+                if current_price <= trailing_stop_price:
+                    reason = (
+                        f"Trailing stop attivato (picco {format_price(highest_price)}, "
+                        f"{change_pct:+.2f}% dall'ingresso)"
+                    )
+            if reason is None and current_rsi is not None and current_rsi >= CONFIG["RSI_SELL_THRESHOLD"]:
+                reason = f"RSI in ipercomprato ({current_rsi:.1f})"
 
         if not reason:
             time.sleep(1)
@@ -360,6 +422,7 @@ def check_sell_signals(open_positions, state):
             f"Motivo: {reason}\n"
             f"Prezzo acquisto: {format_price(entry_price)}\n"
             f"Prezzo vendita (stimato): {format_price(current_price)}\n"
+            f"Massimo toccato: {format_price(highest_price)}\n"
             f"Variazione: {change_pct:+.2f}%\n"
             f"P&L stimato: {pnl_eur:+.2f} EUR"
             f"{order_note}"
@@ -393,12 +456,24 @@ def check_buy_signals(open_positions, candidates, state):
         except Exception as e:
             print(f"[ERRORE] {c['pair']}: {e}")
             continue
-        if len(closes) < CONFIG["RSI_PERIOD"] + 5:
+
+        min_len_needed = max(CONFIG["RSI_PERIOD"] + 5, CONFIG["TREND_SMA_PERIOD"])
+        if len(closes) < min_len_needed:
             continue
 
         volatility = compute_volatility_pct(closes)
         if volatility < CONFIG["MIN_VOLATILITY_PCT"]:
             continue
+
+        current_price = closes[-1]
+
+        if CONFIG["TREND_FILTER_ENABLED"]:
+            sma = compute_sma(closes, CONFIG["TREND_SMA_PERIOD"])
+            if sma is None or current_price < sma:
+                # la moneta e' sotto la sua media mobile di fondo: probabile downtrend
+                # strutturale, salta per evitare di "comprare un coltello che cade"
+                time.sleep(1)
+                continue
 
         rsis = compute_rsi(closes, CONFIG["RSI_PERIOD"])
         if not rsis or len(rsis) < 2:
@@ -409,7 +484,6 @@ def check_buy_signals(open_positions, candidates, state):
             time.sleep(1)
             continue
 
-        current_price = closes[-1]
         raw_volume = CONFIG["EUR_PER_TRADE"] / current_price
         volume = round_volume(raw_volume, c["lot_decimals"])
 
@@ -432,6 +506,13 @@ def check_buy_signals(open_positions, candidates, state):
                 time.sleep(1)
                 continue
 
+        stop_loss_pct = clamp(
+            volatility * CONFIG["STOP_LOSS_ATR_MULT"],
+            CONFIG["MIN_STOP_LOSS_PCT"],
+            CONFIG["MAX_STOP_LOSS_PCT"],
+        )
+        stop_loss_price = current_price * (1 - stop_loss_pct / 100)
+
         change_line = (
             f"Variazione 24h: {c['change_24h']:+.2f}%\n" if c["change_24h"] is not None else ""
         )
@@ -441,6 +522,7 @@ def check_buy_signals(open_positions, candidates, state):
             f"Volume: {volume} {base} (~{CONFIG['EUR_PER_TRADE']:.0f} EUR)\n"
             f"RSI: {curr_rsi:.1f} (risalito da {prev_rsi:.1f})\n"
             f"Volatilita' recente: {volatility:.1f}%\n"
+            f"Stop loss dinamico: {format_price(stop_loss_price)} (-{stop_loss_pct:.1f}%)\n"
             f"Rank market cap: #{c['rank']}\n"
             f"{change_line}"
             f"Modalita': {mode_label()}"
@@ -452,6 +534,9 @@ def check_buy_signals(open_positions, candidates, state):
             "entry_price": current_price,
             "volume": volume,
             "entry_time": datetime.now(timezone.utc).isoformat(),
+            "volatility_pct": volatility,
+            "highest_price": current_price,
+            "stop_loss_price": stop_loss_price,
         }
         time.sleep(1)
 
@@ -497,3 +582,4 @@ def run():
 
 if __name__ == "__main__":
     run()
+
