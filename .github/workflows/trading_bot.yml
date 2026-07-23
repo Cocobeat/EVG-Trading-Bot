@@ -5,7 +5,7 @@ name: Trading Signal Bot
 
 on:
   schedule:
-    - cron: '*/30 * * * *'   # ogni 30 minuti. Modifica qui per cambiare frequenza (es. '*/15 * * * *')
+    - cron: '*/17 * * * *'   # ogni 17 minuti. Modifica qui per cambiare frequenza (es. '*/15 * * * *')
   workflow_dispatch: {}       # permette di avviarlo manualmente dal tab "Actions" per testare
 
 permissions:
