@@ -1,0 +1,499 @@
+"""
+Bot di trading automatico per Kraken (segnali + esecuzione ordini reali).
+
+Analizza monete a bassa/media capitalizzazione quotate in EUR su Kraken,
+cerca segnali di ingresso/uscita, ti avvisa su Telegram e (se configurato)
+PIAZZA DAVVERO gli ordini di acquisto/vendita sul tuo conto Kraken.
+
+MODALITA':
+- Se le variabili KRAKEN_API_KEY / KRAKEN_API_SECRET non sono impostate:
+  il bot funziona in modalita' SOLO SEGNALE (nessun ordine, solo notifiche
+  Telegram). Utile per osservare la strategia prima di rischiare soldi veri.
+- Se sono impostate e CONFIG["KRAKEN_DRY_RUN"] = True (default):
+  il bot chiede a Kraken di VALIDARE l'ordine (parametro 'validate') senza
+  eseguirlo davvero. Nessun soldo si muove, ma verifichi che tutto il
+  collegamento funzioni.
+- Se CONFIG["KRAKEN_DRY_RUN"] = False: il bot piazza ordini di mercato VERI.
+  Soldi reali si muovono. Passa a questa modalita' solo dopo aver testato
+  a lungo le altre due.
+
+SICUREZZA:
+- La chiave API Kraken deve avere SOLO i permessi "Query Funds" e
+  "Create & Modify Orders". MAI il permesso "Withdraw Funds".
+- E' presente un kill-switch: se la perdita cumulata (stimata) supera
+  CONFIG["MAX_TOTAL_LOSS_EUR"], il bot si mette in pausa automaticamente
+  e smette di aprire nuove posizioni finche' non lo riattivi tu a mano
+  (vedi GUIDA.md).
+
+Rischio: le monete a bassa capitalizzazione sono molto volatili, possono avere
+scarsa liquidita' su Kraken (spread ampi, slippage) e la strategia qui sotto e'
+un esempio didattico, NON una garanzia di profitto. Investi solo cio' che sei
+disposto a perdere.
+"""
+
+import base64
+import hashlib
+import hmac
+import json
+import math
+import os
+import time
+import urllib.parse
+from datetime import datetime, timezone
+
+import requests
+
+# ================== CONFIGURAZIONE (modificabile) ==================
+CONFIG = {
+    "QUOTE_CURRENCY": "EUR",
+    "TIMEFRAME_MINUTES": 60,        # candele orarie
+    "LOOKBACK_CANDLES": 60,         # candele scaricate per calcolare gli indicatori
+    "RSI_PERIOD": 14,
+    "RSI_BUY_THRESHOLD": 35.0,      # segnale di acquisto: RSI risale sopra questa soglia
+    "RSI_SELL_THRESHOLD": 70.0,     # segnale di vendita per ipercomprato
+    "TAKE_PROFIT_PCT": 8.0,         # vendita a +8% dal prezzo di ingresso
+    "STOP_LOSS_PCT": -5.0,          # vendita a -5% dal prezzo di ingresso
+    "MIN_MARKET_CAP_RANK": 30,      # esclude le prime 30 monete per market cap (BTC, ETH, ecc.)
+    "MAX_MARKET_CAP_RANK": 250,     # esclude micro-cap troppo illiquide/rischiose
+    "MAX_24H_CHANGE_PCT": 20.0,     # scarta monete gia' salite troppo nelle ultime 24h
+    "MIN_VOLATILITY_PCT": 3.0,      # volatilita' minima richiesta (deviazione standard dei rendimenti, %)
+    "MAX_OPEN_POSITIONS": 3,        # con 100 euro, meglio non frammentare troppo
+    "MAX_PAIRS_TO_SCAN": 35,        # limite di sicurezza per tempo di esecuzione / rate limit
+    "STATE_FILE": "state.json",
+
+    # ---- Esecuzione ordini reali ----
+    "EUR_PER_TRADE": 30.0,          # quanti euro investire per ogni segnale di acquisto
+    "KRAKEN_DRY_RUN": True,         # True = valida l'ordine senza eseguirlo. Metti False solo quando sei sicuro.
+    "MAX_TOTAL_LOSS_EUR": 30.0,     # kill-switch: perdita cumulata oltre la quale il bot si ferma da solo
+}
+
+# Kraken usa ticker diversi da CoinGecko per alcune monete storiche
+ALIAS_KRAKEN_TO_COINGECKO = {
+    "XBT": "btc",
+    "XDG": "doge",
+}
+
+KRAKEN_PUBLIC_API = "https://api.kraken.com/0/public"
+KRAKEN_PRIVATE_BASE = "https://api.kraken.com"
+COINGECKO_API = "https://api.coingecko.com/api/v3"
+
+
+# ================== TELEGRAM ==================
+
+def telegram_send(text):
+    token = os.environ.get("TELEGRAM_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        print("[ATTENZIONE] TELEGRAM_TOKEN o TELEGRAM_CHAT_ID mancanti. Messaggio non inviato:")
+        print(text)
+        return
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        r = requests.post(url, data={"chat_id": chat_id, "text": text}, timeout=15)
+        if r.status_code != 200:
+            print(f"[ERRORE TELEGRAM] {r.status_code}: {r.text}")
+    except Exception as e:
+        print(f"[ERRORE TELEGRAM] {e}")
+
+
+# ================== STATO (persistito in state.json) ==================
+
+def load_state():
+    if os.path.exists(CONFIG["STATE_FILE"]):
+        with open(CONFIG["STATE_FILE"], "r") as f:
+            return json.load(f)
+    return {
+        "open_positions": {},
+        "last_heartbeat_date": None,
+        "cumulative_pnl_eur": 0.0,
+        "trading_paused": False,
+    }
+
+
+def save_state(state):
+    with open(CONFIG["STATE_FILE"], "w") as f:
+        json.dump(state, f, indent=2)
+
+
+# ================== KRAKEN - DATI PUBBLICI ==================
+
+def get_kraken_eur_pairs():
+    """Ritorna { 'ADAEUR': {'base','wsname','ordermin','lot_decimals'}, ... } solo per le coppie in EUR."""
+    r = requests.get(f"{KRAKEN_PUBLIC_API}/AssetPairs", timeout=20)
+    r.raise_for_status()
+    data = r.json()
+    if data.get("error"):
+        raise RuntimeError(f"Errore Kraken AssetPairs: {data['error']}")
+    pairs = {}
+    for name, info in data["result"].items():
+        wsname = info.get("wsname", "") or ""
+        if wsname.endswith(f"/{CONFIG['QUOTE_CURRENCY']}"):
+            base = wsname.split("/")[0]
+            pairs[name] = {
+                "base": base,
+                "wsname": wsname,
+                "ordermin": float(info.get("ordermin", 0) or 0),
+                "lot_decimals": int(info.get("lot_decimals", 8)),
+            }
+    return pairs
+
+
+def get_coingecko_market_data():
+    """Ritorna { 'ada': {'rank': 9, 'change_24h': 2.3}, ... } per le prime 250 monete per market cap."""
+    r = requests.get(
+        f"{COINGECKO_API}/coins/markets",
+        params={
+            "vs_currency": CONFIG["QUOTE_CURRENCY"].lower(),
+            "order": "market_cap_desc",
+            "per_page": 250,
+            "page": 1,
+            "price_change_percentage": "24h",
+        },
+        timeout=20,
+    )
+    r.raise_for_status()
+    data = r.json()
+    out = {}
+    for coin in data:
+        symbol = (coin.get("symbol") or "").lower()
+        out[symbol] = {
+            "rank": coin.get("market_cap_rank"),
+            "change_24h": coin.get("price_change_percentage_24h"),
+        }
+    return out
+
+
+def get_closes(pair_name):
+    """Scarica le candele OHLC da Kraken. Ritorna i prezzi di chiusura dal piu' vecchio al piu' recente."""
+    r = requests.get(
+        f"{KRAKEN_PUBLIC_API}/OHLC",
+        params={"pair": pair_name, "interval": CONFIG["TIMEFRAME_MINUTES"]},
+        timeout=20,
+    )
+    r.raise_for_status()
+    data = r.json()
+    if data.get("error"):
+        raise RuntimeError(f"Errore Kraken OHLC {pair_name}: {data['error']}")
+    result = data["result"]
+    key = [k for k in result.keys() if k != "last"][0]
+    candles = result[key]
+    closes = [float(c[4]) for c in candles]
+    return closes[-CONFIG["LOOKBACK_CANDLES"]:]
+
+
+# ================== KRAKEN - API PRIVATA (esecuzione ordini) ==================
+
+def trading_enabled():
+    return bool(os.environ.get("KRAKEN_API_KEY")) and bool(os.environ.get("KRAKEN_API_SECRET"))
+
+
+def _kraken_signature(urlpath, data, secret):
+    postdata = urllib.parse.urlencode(data)
+    encoded = (str(data["nonce"]) + postdata).encode()
+    message = urlpath.encode() + hashlib.sha256(encoded).digest()
+    mac = hmac.new(base64.b64decode(secret), message, hashlib.sha512)
+    return base64.b64encode(mac.digest()).decode()
+
+
+def kraken_private_request(uri_path, data):
+    api_key = os.environ.get("KRAKEN_API_KEY")
+    api_secret = os.environ.get("KRAKEN_API_SECRET")
+    if not api_key or not api_secret:
+        raise RuntimeError("KRAKEN_API_KEY / KRAKEN_API_SECRET mancanti")
+    payload = dict(data)
+    payload["nonce"] = str(int(time.time() * 1000))
+    headers = {
+        "API-Key": api_key,
+        "API-Sign": _kraken_signature(uri_path, payload, api_secret),
+    }
+    r = requests.post(KRAKEN_PRIVATE_BASE + uri_path, headers=headers, data=payload, timeout=20)
+    r.raise_for_status()
+    result = r.json()
+    if result.get("error"):
+        raise RuntimeError(f"Errore Kraken privato {uri_path}: {result['error']}")
+    return result["result"]
+
+
+def round_volume(volume, lot_decimals):
+    factor = 10 ** lot_decimals
+    return math.floor(volume * factor) / factor
+
+
+def place_market_order(pair_name, side, volume):
+    """side = 'buy' o 'sell'. Rispetta CONFIG['KRAKEN_DRY_RUN'] (validate=True/False)."""
+    data = {
+        "pair": pair_name,
+        "type": side,
+        "ordertype": "market",
+        "volume": f"{volume}",
+        "validate": "true" if CONFIG["KRAKEN_DRY_RUN"] else "false",
+    }
+    return kraken_private_request("/0/private/AddOrder", data)
+
+
+# ================== INDICATORI ==================
+
+def compute_rsi(closes, period):
+    """RSI (Wilder). Ritorna una lista di valori RSI allineata alle candele (dalla piu' vecchia alla piu' recente)."""
+    if len(closes) < period + 2:
+        return None
+    gains, losses = [], []
+    for i in range(1, len(closes)):
+        change = closes[i] - closes[i - 1]
+        gains.append(max(change, 0.0))
+        losses.append(max(-change, 0.0))
+
+    rsis = []
+    avg_gain = sum(gains[:period]) / period
+    avg_loss = sum(losses[:period]) / period
+    rsis.append(100.0 if avg_loss == 0 else 100 - (100 / (1 + avg_gain / avg_loss)))
+
+    for i in range(period, len(gains)):
+        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+        rsi = 100.0 if avg_loss == 0 else 100 - (100 / (1 + avg_gain / avg_loss))
+        rsis.append(rsi)
+    return rsis
+
+
+def compute_volatility_pct(closes):
+    """Deviazione standard dei rendimenti percentuali, come proxy semplice di volatilita'."""
+    if len(closes) < 2:
+        return 0.0
+    returns = [
+        (closes[i] - closes[i - 1]) / closes[i - 1] * 100
+        for i in range(1, len(closes))
+        if closes[i - 1] != 0
+    ]
+    if not returns:
+        return 0.0
+    mean = sum(returns) / len(returns)
+    variance = sum((x - mean) ** 2 for x in returns) / len(returns)
+    return math.sqrt(variance)
+
+
+def build_candidate_universe(kraken_pairs, market_data):
+    candidates = []
+    for pair_name, info in kraken_pairs.items():
+        base = info["base"]
+        cg_symbol = ALIAS_KRAKEN_TO_COINGECKO.get(base, base.lower())
+        md = market_data.get(cg_symbol)
+        if not md or md.get("rank") is None:
+            continue
+        if not (CONFIG["MIN_MARKET_CAP_RANK"] <= md["rank"] <= CONFIG["MAX_MARKET_CAP_RANK"]):
+            continue
+        change_24h = md.get("change_24h")
+        if change_24h is not None and change_24h > CONFIG["MAX_24H_CHANGE_PCT"]:
+            continue
+        candidates.append({
+            "pair": pair_name,
+            "base": base,
+            "rank": md["rank"],
+            "change_24h": change_24h,
+            "ordermin": info["ordermin"],
+            "lot_decimals": info["lot_decimals"],
+        })
+    candidates.sort(key=lambda c: c["rank"])
+    return candidates[: CONFIG["MAX_PAIRS_TO_SCAN"]]
+
+
+def format_price(p):
+    return f"{p:.6f}".rstrip("0").rstrip(".")
+
+
+def mode_label():
+    if not trading_enabled():
+        return "SOLO SEGNALE (nessuna chiave Kraken configurata)"
+    return "DRY-RUN (nessun ordine reale)" if CONFIG["KRAKEN_DRY_RUN"] else "LIVE (ordini reali!)"
+
+
+# ================== LOGICA DI VENDITA ==================
+
+def check_sell_signals(open_positions, state):
+    for base, pos in list(open_positions.items()):
+        pair_name = pos["pair"]
+        try:
+            closes = get_closes(pair_name)
+        except Exception as e:
+            print(f"[ERRORE] {pair_name}: {e}")
+            continue
+        if not closes:
+            continue
+
+        current_price = closes[-1]
+        entry_price = pos["entry_price"]
+        change_pct = (current_price - entry_price) / entry_price * 100
+        rsis = compute_rsi(closes, CONFIG["RSI_PERIOD"])
+        current_rsi = rsis[-1] if rsis else None
+
+        reason = None
+        if change_pct >= CONFIG["TAKE_PROFIT_PCT"]:
+            reason = f"Take profit raggiunto ({change_pct:+.2f}%)"
+        elif change_pct <= CONFIG["STOP_LOSS_PCT"]:
+            reason = f"Stop loss raggiunto ({change_pct:+.2f}%)"
+        elif current_rsi is not None and current_rsi >= CONFIG["RSI_SELL_THRESHOLD"]:
+            reason = f"RSI in ipercomprato ({current_rsi:.1f})"
+
+        if not reason:
+            time.sleep(1)
+            continue
+
+        order_note = ""
+        if trading_enabled():
+            try:
+                result = place_market_order(pair_name, "sell", pos["volume"])
+                txid = result.get("txid", ["(validato, nessun txid)"])[0]
+                order_note = f"\nOrdine: {txid} ({mode_label()})"
+            except Exception as e:
+                telegram_send(
+                    f"⚠️ ERRORE nell'ordine di VENDITA per {base}: {e}\n"
+                    f"La posizione resta aperta nello stato: verificala manualmente su Kraken."
+                )
+                time.sleep(1)
+                continue
+
+        pnl_eur = (current_price - entry_price) * pos["volume"]
+        state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl_eur
+
+        msg = (
+            f"\U0001F534 VENDI {base}/{CONFIG['QUOTE_CURRENCY']}\n"
+            f"Motivo: {reason}\n"
+            f"Prezzo acquisto: {format_price(entry_price)}\n"
+            f"Prezzo vendita (stimato): {format_price(current_price)}\n"
+            f"Variazione: {change_pct:+.2f}%\n"
+            f"P&L stimato: {pnl_eur:+.2f} EUR"
+            f"{order_note}"
+        )
+        telegram_send(msg)
+        del open_positions[base]
+
+        if state["cumulative_pnl_eur"] <= -CONFIG["MAX_TOTAL_LOSS_EUR"] and not state.get("trading_paused"):
+            state["trading_paused"] = True
+            telegram_send(
+                f"\U0001F6D1 KILL-SWITCH ATTIVATO: perdita cumulata stimata "
+                f"{state['cumulative_pnl_eur']:.2f} EUR ha superato il limite di "
+                f"{CONFIG['MAX_TOTAL_LOSS_EUR']} EUR.\n"
+                f"Il bot NON aprira' nuove posizioni finche' non imposti manualmente "
+                f"\"trading_paused\": false in state.json su GitHub."
+            )
+        time.sleep(1)
+
+
+# ================== LOGICA DI ACQUISTO ==================
+
+def check_buy_signals(open_positions, candidates, state):
+    for c in candidates:
+        if len(open_positions) >= CONFIG["MAX_OPEN_POSITIONS"]:
+            break
+        base = c["base"]
+        if base in open_positions:
+            continue
+        try:
+            closes = get_closes(c["pair"])
+        except Exception as e:
+            print(f"[ERRORE] {c['pair']}: {e}")
+            continue
+        if len(closes) < CONFIG["RSI_PERIOD"] + 5:
+            continue
+
+        volatility = compute_volatility_pct(closes)
+        if volatility < CONFIG["MIN_VOLATILITY_PCT"]:
+            continue
+
+        rsis = compute_rsi(closes, CONFIG["RSI_PERIOD"])
+        if not rsis or len(rsis) < 2:
+            continue
+        prev_rsi, curr_rsi = rsis[-2], rsis[-1]
+
+        if not (prev_rsi < CONFIG["RSI_BUY_THRESHOLD"] <= curr_rsi):
+            time.sleep(1)
+            continue
+
+        current_price = closes[-1]
+        raw_volume = CONFIG["EUR_PER_TRADE"] / current_price
+        volume = round_volume(raw_volume, c["lot_decimals"])
+
+        if volume <= 0 or volume < c["ordermin"]:
+            print(
+                f"[SKIP] {base}: volume {volume} sotto il minimo Kraken "
+                f"({c['ordermin']}) per {CONFIG['EUR_PER_TRADE']} EUR allocati."
+            )
+            time.sleep(1)
+            continue
+
+        order_note = ""
+        if trading_enabled():
+            try:
+                result = place_market_order(c["pair"], "buy", volume)
+                txid = result.get("txid", ["(validato, nessun txid)"])[0]
+                order_note = f"\nOrdine: {txid} ({mode_label()})"
+            except Exception as e:
+                telegram_send(f"⚠️ ERRORE nell'ordine di ACQUISTO per {base}: {e}")
+                time.sleep(1)
+                continue
+
+        change_line = (
+            f"Variazione 24h: {c['change_24h']:+.2f}%\n" if c["change_24h"] is not None else ""
+        )
+        msg = (
+            f"\U0001F7E2 COMPRA {base}/{CONFIG['QUOTE_CURRENCY']}\n"
+            f"Prezzo attuale: {format_price(current_price)}\n"
+            f"Volume: {volume} {base} (~{CONFIG['EUR_PER_TRADE']:.0f} EUR)\n"
+            f"RSI: {curr_rsi:.1f} (risalito da {prev_rsi:.1f})\n"
+            f"Volatilita' recente: {volatility:.1f}%\n"
+            f"Rank market cap: #{c['rank']}\n"
+            f"{change_line}"
+            f"Modalita': {mode_label()}"
+            f"{order_note}"
+        )
+        telegram_send(msg)
+        open_positions[base] = {
+            "pair": c["pair"],
+            "entry_price": current_price,
+            "volume": volume,
+            "entry_time": datetime.now(timezone.utc).isoformat(),
+        }
+        time.sleep(1)
+
+
+# ================== CICLO PRINCIPALE ==================
+
+def run():
+    state = load_state()
+    open_positions = state.get("open_positions", {})
+
+    print(f"Modalita' attuale: {mode_label()}")
+    print("Recupero elenco coppie Kraken in EUR...")
+    kraken_pairs = get_kraken_eur_pairs()
+    print(f"Trovate {len(kraken_pairs)} coppie {CONFIG['QUOTE_CURRENCY']} su Kraken.")
+
+    print("Recupero dati di mercato da CoinGecko...")
+    market_data = get_coingecko_market_data()
+
+    candidates = build_candidate_universe(kraken_pairs, market_data)
+    print(f"{len(candidates)} candidati dopo i filtri di rank/pump.")
+
+    check_sell_signals(open_positions, state)
+
+    if state.get("trading_paused"):
+        print("Trading in pausa (kill-switch attivo): nessuna nuova posizione verra' aperta.")
+    elif len(open_positions) < CONFIG["MAX_OPEN_POSITIONS"]:
+        check_buy_signals(open_positions, candidates, state)
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    if state.get("last_heartbeat_date") != today:
+        telegram_send(
+            f"✅ Bot attivo ({mode_label()}) — {len(open_positions)} posizioni aperte, "
+            f"{len(candidates)} candidati monitorati oggi, "
+            f"P&L cumulato stimato: {state.get('cumulative_pnl_eur', 0.0):+.2f} EUR."
+            + (" IN PAUSA (kill-switch)." if state.get("trading_paused") else "")
+        )
+        state["last_heartbeat_date"] = today
+
+    state["open_positions"] = open_positions
+    save_state(state)
+    print("Esecuzione completata.")
+
+
+if __name__ == "__main__":
+    run()
