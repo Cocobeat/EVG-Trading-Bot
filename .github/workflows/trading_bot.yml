@@ -1,0 +1,41 @@
+name: Trading Signal Bot
+
+# Questo file va caricato su GitHub nel percorso: .github/workflows/trading_bot.yml
+# (vedi GUIDA.md per le istruzioni passo-passo)
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # ogni 30 minuti. Modifica qui per cambiare frequenza (es. '*/15 * * * *')
+  workflow_dispatch: {}       # permette di avviarlo manualmente dal tab "Actions" per testare
+
+permissions:
+  contents: write   # necessario per salvare lo stato (state.json) nel repo
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run bot
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bot.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "trading-bot"
+          git config user.email "trading-bot@users.noreply.github.com"
+          git add state.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Aggiorna stato posizioni [skip ci]"
+          git push
