@@ -123,6 +123,119 @@ def telegram_send(text):
         print(f"[ERRORE TELEGRAM] {e}")
 
 
+def check_telegram_commands(state):
+    """Legge eventuali comandi mandati dall'utente al bot Telegram (/pausa, /riprendi,
+    /stato, /vendi_tutto) da quando e' stato controllato l'ultima volta. Va chiamata
+    all'inizio di ogni esecuzione, quindi con un ritardo massimo pari alla frequenza
+    del workflow (default: 30 minuti), a meno di lanciare "Run workflow" a mano."""
+    token = os.environ.get("TELEGRAM_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+    offset = state.get("telegram_update_offset", 0)
+    try:
+        r = requests.get(
+            f"https://api.telegram.org/bot{token}/getUpdates",
+            params={"offset": offset, "timeout": 0},
+            timeout=15,
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        print(f"[ERRORE] lettura comandi Telegram: {e}")
+        return
+    if not data.get("ok"):
+        return
+
+    updates = data.get("result", [])
+    max_update_id = offset - 1
+    for upd in updates:
+        max_update_id = max(max_update_id, upd["update_id"])
+        msg = upd.get("message") or upd.get("edited_message")
+        if not msg:
+            continue
+        msg_chat_id = str(msg.get("chat", {}).get("id", ""))
+        if msg_chat_id != str(chat_id):
+            continue  # ignora messaggi da chat diverse dalla tua
+        text = (msg.get("text") or "").strip().lower().lstrip("/")
+        handle_telegram_command(text, state)
+
+    if updates:
+        state["telegram_update_offset"] = max_update_id + 1
+
+
+def handle_telegram_command(text, state):
+    if text in ("pausa", "stop", "ferma"):
+        state["trading_paused"] = True
+        telegram_send(
+            "⏸ Trading in pausa su tuo comando.\n"
+            "Non verranno aperte nuove posizioni. Le posizioni già aperte restano "
+            "monitorate normalmente (stop loss e trailing stop continuano a funzionare).\n"
+            "Scrivi /riprendi per riattivare, oppure /vendi_tutto per chiudere subito tutto."
+        )
+    elif text in ("riprendi", "resume", "riattiva"):
+        state["trading_paused"] = False
+        telegram_send("▶️ Trading riattivato: il bot torna a cercare nuovi segnali di acquisto.")
+    elif text in ("stato", "status"):
+        positions = state.get("open_positions", {})
+        lines = [f"Stato: {'⏸ IN PAUSA' if state.get('trading_paused') else '▶️ attivo'}"]
+        lines.append(f"P&L cumulato stimato: {state.get('cumulative_pnl_eur', 0.0):+.2f} EUR")
+        if positions:
+            lines.append(f"Posizioni aperte ({len(positions)}):")
+            for base, pos in positions.items():
+                lines.append(
+                    f"- {base}: entrata {format_price(pos['entry_price'])}, "
+                    f"massimo {format_price(pos.get('highest_price', pos['entry_price']))}"
+                )
+        else:
+            lines.append("Nessuna posizione aperta.")
+        telegram_send("\n".join(lines))
+    elif text in ("vendi_tutto", "venditutto", "panic", "emergenza"):
+        state["trading_paused"] = True
+        force_close_all_positions(state)
+
+
+def force_close_all_positions(state):
+    open_positions = state.get("open_positions", {})
+    if not open_positions:
+        telegram_send("🛑 Trading messo in pausa. Non c'erano posizioni aperte da chiudere.")
+        return
+    telegram_send(f"🛑 Chiusura di emergenza di {len(open_positions)} posizioni in corso...")
+    for base, pos in list(open_positions.items()):
+        try:
+            closes = get_closes(pos["pair"])
+            current_price = closes[-1] if closes else pos["entry_price"]
+        except Exception:
+            current_price = pos["entry_price"]
+
+        order_note = ""
+        if trading_enabled():
+            try:
+                result = place_market_order(pos["pair"], "sell", pos["volume"])
+                txid = result.get("txid", ["(validato, nessun txid)"])[0]
+                order_note = f"\nOrdine: {txid} ({mode_label()})"
+            except Exception as e:
+                telegram_send(f"⚠️ ERRORE chiudendo {base}: {e}. Verifica manualmente su Kraken.")
+                continue
+
+        entry_price = pos["entry_price"]
+        change_pct = (current_price - entry_price) / entry_price * 100
+        pnl_eur = (current_price - entry_price) * pos["volume"]
+        state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl_eur
+
+        telegram_send(
+            f"\U0001F534 VENDI (emergenza) {base}/{CONFIG['QUOTE_CURRENCY']}\n"
+            f"Prezzo vendita (stimato): {format_price(current_price)}\n"
+            f"Variazione: {change_pct:+.2f}%\n"
+            f"P&L stimato: {pnl_eur:+.2f} EUR"
+            f"{order_note}"
+        )
+        del open_positions[base]
+
+    state["open_positions"] = open_positions
+    telegram_send("✅ Chiusura di emergenza completata. Trading in pausa (scrivi /riprendi per riattivare).")
+
+
 # ================== STATO (persistito in state.json) ==================
 
 def load_state():
@@ -134,6 +247,7 @@ def load_state():
         "last_heartbeat_date": None,
         "cumulative_pnl_eur": 0.0,
         "trading_paused": False,
+        "telegram_update_offset": 0,
     }
 
 
@@ -547,6 +661,9 @@ def run():
     state = load_state()
     open_positions = state.get("open_positions", {})
 
+    print("Controllo comandi Telegram (/pausa, /riprendi, /stato, /vendi_tutto)...")
+    check_telegram_commands(state)
+
     print(f"Modalita' attuale: {mode_label()}")
     print("Recupero elenco coppie Kraken in EUR...")
     kraken_pairs = get_kraken_eur_pairs()
@@ -582,4 +699,3 @@ def run():
 
 if __name__ == "__main__":
     run()
-
