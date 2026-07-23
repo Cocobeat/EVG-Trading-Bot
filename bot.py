@@ -63,7 +63,7 @@ CONFIG = {
 
     # ---- Esecuzione ordini reali ----
     "EUR_PER_TRADE": 30.0,          # quanti euro investire per ogni segnale di acquisto
-    "KRAKEN_DRY_RUN": True,         # True = valida l'ordine senza eseguirlo. Metti False solo quando sei sicuro.
+    "KRAKEN_DRY_RUN": False,         # True = valida l'ordine senza eseguirlo. Metti False solo quando sei sicuro.
     "MAX_TOTAL_LOSS_EUR": 30.0,     # kill-switch: perdita cumulata oltre la quale il bot si ferma da solo
 }
 
