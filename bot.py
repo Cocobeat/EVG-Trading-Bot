@@ -367,8 +367,9 @@ def place_market_order(pair_name, side, volume):
         "type": side,
         "ordertype": "market",
         "volume": f"{volume}",
-        "validate": "true" if CONFIG["KRAKEN_DRY_RUN"] else "false",
     }
+    if CONFIG["KRAKEN_DRY_RUN"]:
+        data["validate"] = "true"
     return kraken_private_request("/0/private/AddOrder", data)
 
 
