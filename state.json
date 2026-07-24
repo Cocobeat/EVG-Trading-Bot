@@ -1,5 +1,22 @@
 {
-  "open_positions": {},
+  "open_positions": {
+    "INX": {
+      "pair": "INXEUR",
+      "entry_price": 0.006349,
+      "volume": 2756.33958,
+      "entry_time": "2026-07-24T23:46:42.540494+00:00",
+      "highest_price": 0.006349,
+      "last_price": 0.006349,
+      "tp_pct": 8.0,
+      "sl_pct": 8.0,
+      "tp_price": 0.00685692,
+      "sl_price": 0.00584108,
+      "trail_arm": 5.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 15,
+      "strategy": "pump"
+    }
+  },
   "last_heartbeat_date": "2026-07-24",
   "cumulative_pnl_eur": -4.867696372410001,
   "trading_paused": false,
