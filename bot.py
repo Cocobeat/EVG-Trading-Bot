@@ -88,7 +88,7 @@ CONFIG = {
     "BTC_PAIR": "XXBTZEUR",
     "BTC_SMA_PERIOD": 50,
 
-    "KRAKEN_DRY_RUN": True,
+    "KRAKEN_DRY_RUN": False,
     "STATE_FILE": "state.json",
     "TICKER_BATCH_SIZE": 80,
 }
