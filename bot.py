@@ -1,48 +1,12 @@
 """
-Bot di trading automatico per Kraken (segnali + esecuzione ordini reali).
+Bot di trading v4 — Pump Catcher
 
-Analizza monete a bassa/media capitalizzazione quotate in EUR su Kraken,
-cerca segnali di ingresso/uscita, ti avvisa su Telegram e (se configurato)
-PIAZZA DAVVERO gli ordini di acquisto/vendita sul tuo conto Kraken.
+Scansiona TUTTE le coppie EUR su Kraken via Ticker (efficiente),
+individua quelle che stanno pompando (prezzo in salita + volume alto),
+entra con ordine a mercato e esce con TP / trailing stop / SL.
 
-MODALITA':
-- Se le variabili KRAKEN_API_KEY / KRAKEN_API_SECRET non sono impostate:
-  il bot funziona in modalita' SOLO SEGNALE (nessun ordine, solo notifiche
-  Telegram). Utile per osservare la strategia prima di rischiare soldi veri.
-- Se sono impostate e CONFIG["KRAKEN_DRY_RUN"] = True:
-  il bot chiede a Kraken di VALIDARE l'ordine (parametro 'validate') senza
-  eseguirlo davvero. Nessun soldo si muove, ma verifichi che tutto il
-  collegamento funzioni.
-- Se CONFIG["KRAKEN_DRY_RUN"] = False: il bot piazza ordini di mercato VERI.
-  Soldi reali si muovono. Passa a questa modalita' solo dopo aver testato
-  a lungo le altre due.
-
-STRATEGIA (v2 - con trend filter e trailing stop):
-- Ingresso: RSI(14) che risale sopra 35 da sotto (rimbalzo da ipervenduto),
-  SOLO se il prezzo e' sopra la media mobile a 50 periodi (TREND_SMA_PERIOD):
-  evita di comprare rimbalzi in monete che sono in un trend discendente di
-  fondo ("catching a falling knife").
-- Uscita:
-  * Stop loss dinamico: proporzionale alla volatilita' della moneta al
-    momento dell'ingresso (non piu' una percentuale fissa uguale per tutte).
-  * Trailing stop: una volta raggiunto un profitto minimo (TRAIL_ARM_PROFIT_PCT),
-    il bot smette di avere un target fisso e lascia correre il prezzo,
-    vendendo solo se scende di una certa percentuale dal massimo toccato.
-    Questo evita di tagliare i trend forti troppo presto.
-  * RSI in ipercomprato (>= 70) come uscita di sicurezza aggiuntiva.
-
-SICUREZZA:
-- La chiave API Kraken deve avere SOLO i permessi "Query Funds" e
-  "Create & Modify Orders". MAI il permesso "Withdraw Funds".
-- Kill-switch: se la perdita cumulata (stimata) supera
-  CONFIG["MAX_TOTAL_LOSS_EUR"], il bot si mette in pausa automaticamente
-  e smette di aprire nuove posizioni finche' non lo riattivi tu a mano
-  (vedi GUIDA.md).
-
-Rischio: le monete a bassa capitalizzazione sono molto volatili, possono avere
-scarsa liquidita' su Kraken (spread ampi, slippage) e la strategia qui sotto e'
-un esempio didattico, NON una garanzia di profitto. Investi solo cio' che sei
-disposto a perdere.
+Il bot adatta il rischio al regime di mercato (Fear & Greed + BTC trend)
+e invia notifiche Telegram con pulsanti inline per operazioni veloci.
 """
 
 import base64
@@ -57,197 +21,256 @@ from datetime import datetime, timezone
 
 import requests
 
-# ================== CONFIGURAZIONE (modificabile) ==================
+# ================== CONFIGURAZIONE ==================
 CONFIG = {
     "QUOTE_CURRENCY": "EUR",
-    "TIMEFRAME_MINUTES": 60,        # candele orarie
-    "LOOKBACK_CANDLES": 90,         # candele scaricate (deve coprire almeno TREND_SMA_PERIOD)
-    "RSI_PERIOD": 14,
-    "RSI_BUY_THRESHOLD": 35.0,      # segnale di acquisto: RSI risale sopra questa soglia
-    "RSI_SELL_THRESHOLD": 70.0,     # uscita di sicurezza per ipercomprato
 
-    # ---- Filtro di trend (evita di comprare in un downtrend di fondo) ----
-    "TREND_SMA_PERIOD": 50,         # media mobile (candele orarie) usata come filtro di trend
-    "TREND_FILTER_ENABLED": True,   # compra solo se il prezzo e' sopra questa media mobile
+    # ---- Scan ----
+    "SCAN_TIMEFRAME": 5,              # candele a 5 minuti per pump detection
+    "SCAN_LOOKBACK": 60,              # candele da scaricare (~5 ore)
+    "MIN_24H_VOLUME_EUR": 300,        # volume minimo 24h in EUR per considerare una coppia
+    "MIN_TICKER_CHANGE_PCT": 2.0,     # almeno +2% dal prezzo apertura 24h per passare il pre-filtro
 
-    # ---- Uscita: stop loss dinamico + trailing stop (invece di TP/SL fissi) ----
-    "STOP_LOSS_ATR_MULT": 1.5,      # stop loss = volatilita' della moneta * questo moltiplicatore
-    "MIN_STOP_LOSS_PCT": 3.0,       # ma non scendere mai sotto questa percentuale...
-    "MAX_STOP_LOSS_PCT": 10.0,      # ...ne' salire mai sopra questa
-    "TRAIL_ARM_PROFIT_PCT": 3.0,    # il trailing stop si attiva solo dopo questo guadagno minimo
-    "TRAIL_ATR_MULT": 2.0,          # distanza del trailing stop dal massimo = volatilita' * moltiplicatore
-    "MIN_TRAIL_PCT": 4.0,
-    "MAX_TRAIL_PCT": 15.0,
+    # ---- Pump detection ----
+    "PUMP_CANDLE_MIN_PCT": 1.5,       # candela 5min: close almeno +1.5% sopra open
+    "PUMP_VOLUME_SURGE": 1.5,         # volume candela >= 1.5x media
+    "PUMP_RSI_MAX": 85,               # non entrare se RSI gia' troppo alto
+    "PUMP_RSI_PERIOD": 14,
 
-    "MIN_MARKET_CAP_RANK": 30,      # esclude le prime 30 monete per market cap (BTC, ETH, ecc.)
-    "MAX_MARKET_CAP_RANK": 250,     # esclude micro-cap troppo illiquide/rischiose
-    "MAX_24H_CHANGE_PCT": 20.0,     # scarta monete gia' salite troppo nelle ultime 24h
-    "MIN_VOLATILITY_PCT": 3.0,      # volatilita' minima richiesta (deviazione standard dei rendimenti, %)
-    "MAX_OPEN_POSITIONS": 3,        # con 100 euro, meglio non frammentare troppo
-    "MAX_PAIRS_TO_SCAN": 35,        # limite di sicurezza per tempo di esecuzione / rate limit
+    # ---- Exit ----
+    "TAKE_PROFIT_PCT": 8.0,           # TP fisso
+    "STOP_LOSS_PCT": 4.0,             # SL fisso
+    "TRAIL_ARM_PCT": 3.0,             # trailing stop si arma dopo +3%
+    "TRAIL_DISTANCE_PCT": 2.5,        # trailing: vende se scende 2.5% dal picco
+
+    # ---- Posizioni ----
+    "EUR_PER_TRADE": 30.0,            # valore base, scalato dal regime
+    "MAX_OPEN_POSITIONS": 3,          # valore base, scalato dal regime
+    "MAX_TOTAL_LOSS_EUR": 30.0,
+
+    # ---- Regime ----
+    "FGI_BULL_THRESHOLD": 55,
+    "FGI_BEAR_THRESHOLD": 35,
+    "FGI_EXTREME_FEAR_THRESHOLD": 20,
+    "BTC_PAIR": "XXBTZEUR",
+    "BTC_SMA_PERIOD": 50,
+
+    # ---- Esecuzione ----
+    "KRAKEN_DRY_RUN": False,
     "STATE_FILE": "state.json",
-
-    # ---- Esecuzione ordini reali ----
-    "EUR_PER_TRADE": 30.0,          # quanti euro investire per ogni segnale di acquisto
-    "KRAKEN_DRY_RUN": False,         # True = valida l'ordine senza eseguirlo. Rimesso a True apposta:
-                                     # testa la nuova strategia prima di tornare a False (vedi GUIDA.md).
-    "MAX_TOTAL_LOSS_EUR": 30.0,     # kill-switch: perdita cumulata oltre la quale il bot si ferma da solo
+    "TICKER_BATCH_SIZE": 80,
 }
 
-# Kraken usa ticker diversi da CoinGecko per alcune monete storiche
-ALIAS_KRAKEN_TO_COINGECKO = {
-    "XBT": "btc",
-    "XDG": "doge",
+RISK_PROFILES = {
+    "BULL_AGGRESSIVE": {
+        "eur_mult": 1.3, "pos_add": 2, "tp_mult": 1.3, "sl_mult": 1.3,
+    },
+    "BULL_MODERATE": {
+        "eur_mult": 1.15, "pos_add": 1, "tp_mult": 1.15, "sl_mult": 1.0,
+    },
+    "NEUTRAL": {
+        "eur_mult": 1.0, "pos_add": 0, "tp_mult": 1.0, "sl_mult": 1.0,
+    },
+    "BEAR_DEFENSIVE": {
+        "eur_mult": 0.7, "pos_add": -1, "tp_mult": 0.8, "sl_mult": 0.7,
+    },
+    "EXTREME_FEAR": {
+        "eur_mult": 0.5, "pos_add": -1, "tp_mult": 0.7, "sl_mult": 0.6,
+    },
 }
 
-KRAKEN_PUBLIC_API = "https://api.kraken.com/0/public"
-KRAKEN_PRIVATE_BASE = "https://api.kraken.com"
-COINGECKO_API = "https://api.coingecko.com/api/v3"
+REGIME_LABEL = {
+    "BULL_AGGRESSIVE": "\U0001F7E2 BULL AGGRESSIVO",
+    "BULL_MODERATE": "\U0001F7E1 BULL MODERATO",
+    "NEUTRAL": "⚪ NEUTRALE",
+    "BEAR_DEFENSIVE": "\U0001F534 BEAR DIFENSIVO",
+    "EXTREME_FEAR": "\U0001F7E3 PAURA ESTREMA",
+}
+
+KRAKEN_PUBLIC = "https://api.kraken.com/0/public"
+KRAKEN_PRIVATE = "https://api.kraken.com"
+FGI_API = "https://api.alternative.me/fng/"
 
 
-# ================== TELEGRAM ==================
+# ================== TELEGRAM (con pulsanti inline) ==================
 
-def telegram_send(text):
+def telegram_send(text, buttons=None):
     token = os.environ.get("TELEGRAM_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
-        print("[ATTENZIONE] TELEGRAM_TOKEN o TELEGRAM_CHAT_ID mancanti. Messaggio non inviato:")
         print(text)
         return
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if buttons:
+        payload["reply_markup"] = json.dumps({"inline_keyboard": buttons})
     try:
-        r = requests.post(url, data={"chat_id": chat_id, "text": text}, timeout=15)
+        r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                          data=payload, timeout=15)
         if r.status_code != 200:
-            print(f"[ERRORE TELEGRAM] {r.status_code}: {r.text}")
+            print(f"[TG ERR] {r.status_code}: {r.text}")
     except Exception as e:
-        print(f"[ERRORE TELEGRAM] {e}")
+        print(f"[TG ERR] {e}")
+
+
+def answer_callback(callback_id):
+    token = os.environ.get("TELEGRAM_TOKEN")
+    if not token:
+        return
+    try:
+        requests.post(f"https://api.telegram.org/bot{token}/answerCallbackQuery",
+                      data={"callback_query_id": callback_id}, timeout=5)
+    except Exception:
+        pass
 
 
 def check_telegram_commands(state):
-    """Legge eventuali comandi mandati dall'utente al bot Telegram (/pausa, /riprendi,
-    /stato, /vendi_tutto) da quando e' stato controllato l'ultima volta. Va chiamata
-    all'inizio di ogni esecuzione, quindi con un ritardo massimo pari alla frequenza
-    del workflow (default: 30 minuti), a meno di lanciare "Run workflow" a mano."""
     token = os.environ.get("TELEGRAM_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
         return
     offset = state.get("telegram_update_offset", 0)
     try:
-        r = requests.get(
-            f"https://api.telegram.org/bot{token}/getUpdates",
-            params={"offset": offset, "timeout": 0},
-            timeout=15,
-        )
+        r = requests.get(f"https://api.telegram.org/bot{token}/getUpdates",
+                         params={"offset": offset, "timeout": 0}, timeout=15)
         r.raise_for_status()
         data = r.json()
     except Exception as e:
-        print(f"[ERRORE] lettura comandi Telegram: {e}")
+        print(f"[ERR] Telegram getUpdates: {e}")
         return
     if not data.get("ok"):
         return
 
     updates = data.get("result", [])
-    max_update_id = offset - 1
+    max_id = offset - 1
     for upd in updates:
-        max_update_id = max(max_update_id, upd["update_id"])
+        max_id = max(max_id, upd["update_id"])
+
+        # Messaggio testuale
         msg = upd.get("message") or upd.get("edited_message")
-        if not msg:
+        if msg:
+            if str(msg.get("chat", {}).get("id", "")) == str(chat_id):
+                txt = (msg.get("text") or "").strip().lower().lstrip("/")
+                handle_command(txt, state)
             continue
-        msg_chat_id = str(msg.get("chat", {}).get("id", ""))
-        if msg_chat_id != str(chat_id):
-            continue  # ignora messaggi da chat diverse dalla tua
-        text = (msg.get("text") or "").strip().lower().lstrip("/")
-        handle_telegram_command(text, state)
+
+        # Callback da pulsante inline
+        cb = upd.get("callback_query")
+        if cb:
+            if str(cb.get("message", {}).get("chat", {}).get("id", "")) == str(chat_id):
+                handle_command((cb.get("data") or "").strip().lower(), state)
+                answer_callback(cb["id"])
 
     if updates:
-        state["telegram_update_offset"] = max_update_id + 1
+        state["telegram_update_offset"] = max_id + 1
 
 
-def handle_telegram_command(text, state):
+def handle_command(text, state):
     if text in ("pausa", "stop", "ferma"):
         state["trading_paused"] = True
-        telegram_send(
-            "⏸ Trading in pausa su tuo comando.\n"
-            "Non verranno aperte nuove posizioni. Le posizioni già aperte restano "
-            "monitorate normalmente (stop loss e trailing stop continuano a funzionare).\n"
-            "Scrivi /riprendi per riattivare, oppure /vendi_tutto per chiudere subito tutto."
-        )
+        telegram_send("⏸ Trading in pausa. Posizioni aperte ancora monitorate.",
+                      control_buttons())
+
     elif text in ("riprendi", "resume", "riattiva"):
         state["trading_paused"] = False
-        telegram_send("▶️ Trading riattivato: il bot torna a cercare nuovi segnali di acquisto.")
+        telegram_send("▶️ Trading riattivato.", control_buttons())
+
     elif text in ("stato", "status"):
-        positions = state.get("open_positions", {})
-        lines = [f"Stato: {'⏸ IN PAUSA' if state.get('trading_paused') else '▶️ attivo'}"]
-        lines.append(f"P&L cumulato stimato: {state.get('cumulative_pnl_eur', 0.0):+.2f} EUR")
-        if positions:
-            lines.append(f"Posizioni aperte ({len(positions)}):")
-            for base, pos in positions.items():
-                lines.append(
-                    f"- {base}: entrata {format_price(pos['entry_price'])}, "
-                    f"massimo {format_price(pos.get('highest_price', pos['entry_price']))}"
-                )
-        else:
-            lines.append("Nessuna posizione aperta.")
-        telegram_send("\n".join(lines))
+        send_status(state)
+
     elif text in ("vendi_tutto", "venditutto", "panic", "emergenza"):
         state["trading_paused"] = True
-        force_close_all_positions(state)
+        force_close_all(state)
+
+    elif text.startswith("vendi_"):
+        base = text[6:].upper()
+        force_close_one(state, base)
 
 
-def force_close_all_positions(state):
-    open_positions = state.get("open_positions", {})
-    if not open_positions:
-        telegram_send("🛑 Trading messo in pausa. Non c'erano posizioni aperte da chiudere.")
+def send_status(state):
+    pos = state.get("open_positions", {})
+    regime = state.get("current_regime", "NEUTRAL")
+    fgi = state.get("last_fgi")
+    lines = [
+        f"{'⏸ PAUSA' if state.get('trading_paused') else '▶️ Attivo'} | {REGIME_LABEL.get(regime, regime)}",
+        f"F&G: {fgi if fgi is not None else '?'} | P&L: {state.get('cumulative_pnl_eur', 0.0):+.2f}€",
+    ]
+    btns = []
+    if pos:
+        lines.append(f"\n<b>Posizioni ({len(pos)}):</b>")
+        for base, p in pos.items():
+            chg = (p.get("last_price", p["entry_price"]) - p["entry_price"]) / p["entry_price"] * 100
+            lines.append(f"• {base}: {chg:+.1f}% (entry {fp(p['entry_price'])})")
+            btns.append([{"text": f"Vendi {base}", "callback_data": f"vendi_{base.lower()}"}])
+    else:
+        lines.append("\nNessuna posizione aperta.")
+    btns.extend(control_buttons())
+    telegram_send("\n".join(lines), btns)
+
+
+def control_buttons():
+    return [
+        [{"text": "⏸ Pausa", "callback_data": "pausa"},
+         {"text": "▶️ Riprendi", "callback_data": "riprendi"}],
+        [{"text": "📊 Stato", "callback_data": "stato"},
+         {"text": "🛑 Vendi tutto", "callback_data": "vendi_tutto"}],
+    ]
+
+
+# ================== CHIUSURA POSIZIONI ==================
+
+def force_close_all(state):
+    positions = state.get("open_positions", {})
+    if not positions:
+        telegram_send("🛑 Pausa attivata. Nessuna posizione da chiudere.", control_buttons())
         return
-    telegram_send(f"🛑 Chiusura di emergenza di {len(open_positions)} posizioni in corso...")
-    for base, pos in list(open_positions.items()):
+    telegram_send(f"🛑 Chiusura emergenza {len(positions)} posizioni...")
+    for base in list(positions.keys()):
+        force_close_one(state, base)
+    telegram_send("✅ Tutto chiuso. /riprendi per riattivare.", control_buttons())
+
+
+def force_close_one(state, base):
+    positions = state.get("open_positions", {})
+    pos = positions.get(base)
+    if not pos:
+        telegram_send(f"Nessuna posizione aperta per {base}.")
+        return
+
+    current_price = pos.get("last_price", pos["entry_price"])
+    order_note = ""
+    if trading_enabled():
         try:
-            closes = get_closes(pos["pair"])
-            current_price = closes[-1] if closes else pos["entry_price"]
-        except Exception:
-            current_price = pos["entry_price"]
+            result = place_order(pos["pair"], "sell", pos["volume"])
+            txid = result.get("txid", ["(ok)"])[0]
+            order_note = f"\nOrdine: {txid} ({mode_label()})"
+        except Exception as e:
+            telegram_send(f"⚠️ Errore vendita {base}: {e}")
+            return
 
-        order_note = ""
-        if trading_enabled():
-            try:
-                result = place_market_order(pos["pair"], "sell", pos["volume"])
-                txid = result.get("txid", ["(validato, nessun txid)"])[0]
-                order_note = f"\nOrdine: {txid} ({mode_label()})"
-            except Exception as e:
-                telegram_send(f"⚠️ ERRORE chiudendo {base}: {e}. Verifica manualmente su Kraken.")
-                continue
+    entry = pos["entry_price"]
+    chg = (current_price - entry) / entry * 100
+    pnl = (current_price - entry) * pos["volume"]
+    state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl
 
-        entry_price = pos["entry_price"]
-        change_pct = (current_price - entry_price) / entry_price * 100
-        pnl_eur = (current_price - entry_price) * pos["volume"]
-        state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl_eur
-
-        telegram_send(
-            f"\U0001F534 VENDI (emergenza) {base}/{CONFIG['QUOTE_CURRENCY']}\n"
-            f"Prezzo vendita (stimato): {format_price(current_price)}\n"
-            f"Variazione: {change_pct:+.2f}%\n"
-            f"P&L stimato: {pnl_eur:+.2f} EUR"
-            f"{order_note}"
-        )
-        del open_positions[base]
-
-    state["open_positions"] = open_positions
-    telegram_send("✅ Chiusura di emergenza completata. Trading in pausa (scrivi /riprendi per riattivare).")
+    telegram_send(
+        f"🔴 VENDUTO {base}/{CONFIG['QUOTE_CURRENCY']}\n"
+        f"{fp(entry)} → {fp(current_price)} ({chg:+.1f}%)\n"
+        f"P&L: {pnl:+.2f}€ (cum: {state['cumulative_pnl_eur']:+.2f}€){order_note}",
+        control_buttons(),
+    )
+    del positions[base]
 
 
-# ================== STATO (persistito in state.json) ==================
+# ================== STATO ==================
 
 def load_state():
     if os.path.exists(CONFIG["STATE_FILE"]):
         with open(CONFIG["STATE_FILE"], "r") as f:
             return json.load(f)
     return {
-        "open_positions": {},
-        "last_heartbeat_date": None,
-        "cumulative_pnl_eur": 0.0,
-        "trading_paused": False,
-        "telegram_update_offset": 0,
+        "open_positions": {}, "last_heartbeat_date": None,
+        "cumulative_pnl_eur": 0.0, "trading_paused": False,
+        "telegram_update_offset": 0, "current_regime": "NEUTRAL", "last_fgi": None,
     }
 
 
@@ -256,446 +279,490 @@ def save_state(state):
         json.dump(state, f, indent=2)
 
 
-# ================== KRAKEN - DATI PUBBLICI ==================
+# ================== REGIME DETECTION ==================
 
-def get_kraken_eur_pairs():
-    """Ritorna { 'ADAEUR': {'base','wsname','ordermin','lot_decimals'}, ... } solo per le coppie in EUR."""
-    r = requests.get(f"{KRAKEN_PUBLIC_API}/AssetPairs", timeout=20)
+def get_fgi():
+    try:
+        r = requests.get(FGI_API, timeout=10)
+        r.raise_for_status()
+        return int(r.json()["data"][0]["value"])
+    except Exception as e:
+        print(f"[WARN] FGI: {e}")
+        return None
+
+
+def get_btc_above_sma():
+    try:
+        ohlc = get_ohlc(CONFIG["BTC_PAIR"], 60, CONFIG["BTC_SMA_PERIOD"] + 10)
+        closes = ohlc["closes"]
+        if len(closes) < CONFIG["BTC_SMA_PERIOD"]:
+            return None
+        sma = sum(closes[-CONFIG["BTC_SMA_PERIOD"]:]) / CONFIG["BTC_SMA_PERIOD"]
+        return closes[-1] > sma
+    except Exception as e:
+        print(f"[WARN] BTC trend: {e}")
+        return None
+
+
+def detect_regime():
+    fgi = get_fgi()
+    btc = get_btc_above_sma()
+    print(f"F&G: {fgi} | BTC>SMA: {btc}")
+    if fgi is None and btc is None:
+        return "NEUTRAL", fgi, btc
+    if fgi is not None and fgi <= CONFIG["FGI_EXTREME_FEAR_THRESHOLD"]:
+        return "EXTREME_FEAR", fgi, btc
+    if fgi is not None and fgi >= CONFIG["FGI_BULL_THRESHOLD"] and btc is True:
+        return "BULL_AGGRESSIVE", fgi, btc
+    if btc is True and (fgi is None or fgi >= CONFIG["FGI_BEAR_THRESHOLD"]):
+        return "BULL_MODERATE", fgi, btc
+    if (fgi is not None and fgi < CONFIG["FGI_BEAR_THRESHOLD"]) or btc is False:
+        return "BEAR_DEFENSIVE", fgi, btc
+    return "NEUTRAL", fgi, btc
+
+
+def get_params(regime):
+    p = RISK_PROFILES.get(regime, RISK_PROFILES["NEUTRAL"])
+    return {
+        "eur": round(CONFIG["EUR_PER_TRADE"] * p["eur_mult"], 2),
+        "max_pos": max(1, CONFIG["MAX_OPEN_POSITIONS"] + p["pos_add"]),
+        "tp_pct": CONFIG["TAKE_PROFIT_PCT"] * p["tp_mult"],
+        "sl_pct": CONFIG["STOP_LOSS_PCT"] * p["sl_mult"],
+        "trail_arm": CONFIG["TRAIL_ARM_PCT"],
+        "trail_dist": CONFIG["TRAIL_DISTANCE_PCT"],
+    }
+
+
+# ================== KRAKEN API ==================
+
+def get_ohlc(pair, interval=None, lookback=None):
+    if interval is None:
+        interval = CONFIG["SCAN_TIMEFRAME"]
+    if lookback is None:
+        lookback = CONFIG["SCAN_LOOKBACK"]
+    r = requests.get(f"{KRAKEN_PUBLIC}/OHLC",
+                     params={"pair": pair, "interval": interval}, timeout=20)
     r.raise_for_status()
     data = r.json()
     if data.get("error"):
-        raise RuntimeError(f"Errore Kraken AssetPairs: {data['error']}")
+        raise RuntimeError(f"OHLC {pair}: {data['error']}")
+    result = data["result"]
+    key = [k for k in result if k != "last"][0]
+    candles = result[key]
+    n = lookback
+    return {
+        "closes": [float(c[4]) for c in candles][-n:],
+        "opens": [float(c[1]) for c in candles][-n:],
+        "volumes": [float(c[6]) for c in candles][-n:],
+        "highs": [float(c[2]) for c in candles][-n:],
+        "lows": [float(c[3]) for c in candles][-n:],
+    }
+
+
+def get_all_eur_pairs():
+    r = requests.get(f"{KRAKEN_PUBLIC}/AssetPairs", timeout=20)
+    r.raise_for_status()
+    data = r.json()
+    if data.get("error"):
+        raise RuntimeError(f"AssetPairs: {data['error']}")
     pairs = {}
     for name, info in data["result"].items():
-        wsname = info.get("wsname", "") or ""
-        if wsname.endswith(f"/{CONFIG['QUOTE_CURRENCY']}"):
-            base = wsname.split("/")[0]
+        ws = info.get("wsname", "") or ""
+        if ws.endswith(f"/{CONFIG['QUOTE_CURRENCY']}"):
             pairs[name] = {
-                "base": base,
-                "wsname": wsname,
+                "base": ws.split("/")[0],
                 "ordermin": float(info.get("ordermin", 0) or 0),
                 "lot_decimals": int(info.get("lot_decimals", 8)),
             }
     return pairs
 
 
-def get_coingecko_market_data():
-    """Ritorna { 'ada': {'rank': 9, 'change_24h': 2.3}, ... } per le prime 250 monete per market cap."""
-    r = requests.get(
-        f"{COINGECKO_API}/coins/markets",
-        params={
-            "vs_currency": CONFIG["QUOTE_CURRENCY"].lower(),
-            "order": "market_cap_desc",
-            "per_page": 250,
-            "page": 1,
-            "price_change_percentage": "24h",
-        },
-        timeout=20,
-    )
-    r.raise_for_status()
-    data = r.json()
-    out = {}
-    for coin in data:
-        symbol = (coin.get("symbol") or "").lower()
-        out[symbol] = {
-            "rank": coin.get("market_cap_rank"),
-            "change_24h": coin.get("price_change_percentage_24h"),
-        }
-    return out
+def get_ticker_batch(pair_names):
+    """Ticker per tutte le coppie, a batch."""
+    all_tickers = {}
+    names = list(pair_names)
+    batch = CONFIG["TICKER_BATCH_SIZE"]
+    for i in range(0, len(names), batch):
+        chunk = names[i:i + batch]
+        try:
+            r = requests.get(f"{KRAKEN_PUBLIC}/Ticker",
+                             params={"pair": ",".join(chunk)}, timeout=20)
+            r.raise_for_status()
+            data = r.json()
+            if data.get("result"):
+                all_tickers.update(data["result"])
+        except Exception as e:
+            print(f"[WARN] Ticker batch {i}: {e}")
+        time.sleep(0.3)
+    return all_tickers
 
-
-def get_closes(pair_name):
-    """Scarica le candele OHLC da Kraken. Ritorna i prezzi di chiusura dal piu' vecchio al piu' recente."""
-    r = requests.get(
-        f"{KRAKEN_PUBLIC_API}/OHLC",
-        params={"pair": pair_name, "interval": CONFIG["TIMEFRAME_MINUTES"]},
-        timeout=20,
-    )
-    r.raise_for_status()
-    data = r.json()
-    if data.get("error"):
-        raise RuntimeError(f"Errore Kraken OHLC {pair_name}: {data['error']}")
-    result = data["result"]
-    key = [k for k in result.keys() if k != "last"][0]
-    candles = result[key]
-    closes = [float(c[4]) for c in candles]
-    return closes[-CONFIG["LOOKBACK_CANDLES"]:]
-
-
-# ================== KRAKEN - API PRIVATA (esecuzione ordini) ==================
 
 def trading_enabled():
     return bool(os.environ.get("KRAKEN_API_KEY")) and bool(os.environ.get("KRAKEN_API_SECRET"))
 
 
-def _kraken_signature(urlpath, data, secret):
-    postdata = urllib.parse.urlencode(data)
-    encoded = (str(data["nonce"]) + postdata).encode()
-    message = urlpath.encode() + hashlib.sha256(encoded).digest()
-    mac = hmac.new(base64.b64decode(secret), message, hashlib.sha512)
+def _kraken_sig(path, data, secret):
+    post = urllib.parse.urlencode(data)
+    enc = (str(data["nonce"]) + post).encode()
+    msg = path.encode() + hashlib.sha256(enc).digest()
+    mac = hmac.new(base64.b64decode(secret), msg, hashlib.sha512)
     return base64.b64encode(mac.digest()).decode()
 
 
-def kraken_private_request(uri_path, data):
-    api_key = os.environ.get("KRAKEN_API_KEY")
-    api_secret = os.environ.get("KRAKEN_API_SECRET")
-    if not api_key or not api_secret:
-        raise RuntimeError("KRAKEN_API_KEY / KRAKEN_API_SECRET mancanti")
+def kraken_private(path, data):
+    key = os.environ.get("KRAKEN_API_KEY")
+    secret = os.environ.get("KRAKEN_API_SECRET")
+    if not key or not secret:
+        raise RuntimeError("Chiavi Kraken mancanti")
     payload = dict(data)
     payload["nonce"] = str(int(time.time() * 1000))
-    headers = {
-        "API-Key": api_key,
-        "API-Sign": _kraken_signature(uri_path, payload, api_secret),
-    }
-    r = requests.post(KRAKEN_PRIVATE_BASE + uri_path, headers=headers, data=payload, timeout=20)
+    headers = {"API-Key": key, "API-Sign": _kraken_sig(path, payload, secret)}
+    r = requests.post(KRAKEN_PRIVATE + path, headers=headers, data=payload, timeout=20)
     r.raise_for_status()
-    result = r.json()
-    if result.get("error"):
-        raise RuntimeError(f"Errore Kraken privato {uri_path}: {result['error']}")
-    return result["result"]
+    res = r.json()
+    if res.get("error"):
+        raise RuntimeError(f"Kraken {path}: {res['error']}")
+    return res["result"]
 
 
-def round_volume(volume, lot_decimals):
-    factor = 10 ** lot_decimals
-    return math.floor(volume * factor) / factor
-
-
-def place_market_order(pair_name, side, volume):
-    """side = 'buy' o 'sell'. Rispetta CONFIG['KRAKEN_DRY_RUN'] (validate=True/False)."""
-    data = {
-        "pair": pair_name,
-        "type": side,
-        "ordertype": "market",
-        "volume": f"{volume}",
-    }
+def place_order(pair, side, volume):
+    data = {"pair": pair, "type": side, "ordertype": "market", "volume": f"{volume}"}
     if CONFIG["KRAKEN_DRY_RUN"]:
         data["validate"] = "true"
-    return kraken_private_request("/0/private/AddOrder", data)
-
-
-# ================== INDICATORI ==================
-
-def compute_rsi(closes, period):
-    """RSI (Wilder). Ritorna una lista di valori RSI allineata alle candele (dalla piu' vecchia alla piu' recente)."""
-    if len(closes) < period + 2:
-        return None
-    gains, losses = [], []
-    for i in range(1, len(closes)):
-        change = closes[i] - closes[i - 1]
-        gains.append(max(change, 0.0))
-        losses.append(max(-change, 0.0))
-
-    rsis = []
-    avg_gain = sum(gains[:period]) / period
-    avg_loss = sum(losses[:period]) / period
-    rsis.append(100.0 if avg_loss == 0 else 100 - (100 / (1 + avg_gain / avg_loss)))
-
-    for i in range(period, len(gains)):
-        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
-        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
-        rsi = 100.0 if avg_loss == 0 else 100 - (100 / (1 + avg_gain / avg_loss))
-        rsis.append(rsi)
-    return rsis
-
-
-def compute_volatility_pct(closes):
-    """Deviazione standard dei rendimenti percentuali, come proxy semplice di volatilita'."""
-    if len(closes) < 2:
-        return 0.0
-    returns = [
-        (closes[i] - closes[i - 1]) / closes[i - 1] * 100
-        for i in range(1, len(closes))
-        if closes[i - 1] != 0
-    ]
-    if not returns:
-        return 0.0
-    mean = sum(returns) / len(returns)
-    variance = sum((x - mean) ** 2 for x in returns) / len(returns)
-    return math.sqrt(variance)
-
-
-def compute_sma(closes, period):
-    """Media mobile semplice sugli ultimi 'period' valori di chiusura."""
-    if len(closes) < period:
-        return None
-    return sum(closes[-period:]) / period
-
-
-def clamp(value, min_value, max_value):
-    return max(min_value, min(value, max_value))
-
-
-def build_candidate_universe(kraken_pairs, market_data):
-    candidates = []
-    for pair_name, info in kraken_pairs.items():
-        base = info["base"]
-        cg_symbol = ALIAS_KRAKEN_TO_COINGECKO.get(base, base.lower())
-        md = market_data.get(cg_symbol)
-        if not md or md.get("rank") is None:
-            continue
-        if not (CONFIG["MIN_MARKET_CAP_RANK"] <= md["rank"] <= CONFIG["MAX_MARKET_CAP_RANK"]):
-            continue
-        change_24h = md.get("change_24h")
-        if change_24h is not None and change_24h > CONFIG["MAX_24H_CHANGE_PCT"]:
-            continue
-        candidates.append({
-            "pair": pair_name,
-            "base": base,
-            "rank": md["rank"],
-            "change_24h": change_24h,
-            "ordermin": info["ordermin"],
-            "lot_decimals": info["lot_decimals"],
-        })
-    candidates.sort(key=lambda c: c["rank"])
-    return candidates[: CONFIG["MAX_PAIRS_TO_SCAN"]]
-
-
-def format_price(p):
-    return f"{p:.6f}".rstrip("0").rstrip(".")
+    return kraken_private("/0/private/AddOrder", data)
 
 
 def mode_label():
     if not trading_enabled():
-        return "SOLO SEGNALE (nessuna chiave Kraken configurata)"
-    return "DRY-RUN (nessun ordine reale)" if CONFIG["KRAKEN_DRY_RUN"] else "LIVE (ordini reali!)"
+        return "SEGNALE"
+    return "DRY-RUN" if CONFIG["KRAKEN_DRY_RUN"] else "LIVE"
 
 
-# ================== LOGICA DI VENDITA ==================
+# ================== INDICATORI ==================
 
-def check_sell_signals(open_positions, state):
-    for base, pos in list(open_positions.items()):
-        pair_name = pos["pair"]
-        try:
-            closes = get_closes(pair_name)
-        except Exception as e:
-            print(f"[ERRORE] {pair_name}: {e}")
+def compute_rsi(closes, period=14):
+    if len(closes) < period + 2:
+        return None
+    gains, losses = [], []
+    for i in range(1, len(closes)):
+        d = closes[i] - closes[i - 1]
+        gains.append(max(d, 0.0))
+        losses.append(max(-d, 0.0))
+    ag = sum(gains[:period]) / period
+    al = sum(losses[:period]) / period
+    rsis = [100.0 if al == 0 else 100 - 100 / (1 + ag / al)]
+    for i in range(period, len(gains)):
+        ag = (ag * (period - 1) + gains[i]) / period
+        al = (al * (period - 1) + losses[i]) / period
+        rsis.append(100.0 if al == 0 else 100 - 100 / (1 + ag / al))
+    return rsis
+
+
+def fp(p):
+    return f"{p:.6f}".rstrip("0").rstrip(".")
+
+
+def round_vol(v, dec):
+    f = 10 ** dec
+    return math.floor(v * f) / f
+
+
+# ================== SCAN & FILTER ==================
+
+def scan_pumping_pairs(all_pairs, tickers):
+    """Pre-filtra le coppie che stanno pompando usando i dati del Ticker."""
+    pumping = []
+    for pair_name, info in all_pairs.items():
+        tick = tickers.get(pair_name)
+        if not tick:
             continue
-        if not closes:
+
+        last_price = float(tick["c"][0])
+        open_price = float(tick["o"])
+        vol_24h = float(tick["v"][1])  # volume 24h in base currency
+
+        if open_price <= 0:
             continue
 
-        current_price = closes[-1]
-        entry_price = pos["entry_price"]
-        change_pct = (current_price - entry_price) / entry_price * 100
+        # Volume in EUR
+        vol_eur = vol_24h * last_price
+        if vol_eur < CONFIG["MIN_24H_VOLUME_EUR"]:
+            continue
 
-        # aggiorna il massimo storico raggiunto da quando e' aperta la posizione
-        pos["highest_price"] = max(pos.get("highest_price", entry_price), current_price)
-        highest_price = pos["highest_price"]
+        change_pct = (last_price - open_price) / open_price * 100
+        if change_pct < CONFIG["MIN_TICKER_CHANGE_PCT"]:
+            continue
 
-        entry_volatility = pos.get("volatility_pct", CONFIG["MIN_VOLATILITY_PCT"])
-        stop_loss_price = pos.get(
-            "stop_loss_price",
-            entry_price * (1 - CONFIG["MIN_STOP_LOSS_PCT"] / 100),
-        )
+        pumping.append({
+            "pair": pair_name,
+            "base": info["base"],
+            "ordermin": info["ordermin"],
+            "lot_decimals": info["lot_decimals"],
+            "last_price": last_price,
+            "change_today_pct": change_pct,
+            "vol_eur_24h": vol_eur,
+        })
 
-        rsis = compute_rsi(closes, CONFIG["RSI_PERIOD"])
-        current_rsi = rsis[-1] if rsis else None
+    # Ordina per variazione oggi (i pump più forti prima)
+    pumping.sort(key=lambda x: x["change_today_pct"], reverse=True)
+    return pumping
+
+
+# ================== SELL LOGIC ==================
+
+def check_sells(positions, tickers, state, params):
+    for base, pos in list(positions.items()):
+        tick = tickers.get(pos["pair"])
+        if not tick:
+            continue
+        price = float(tick["c"][0])
+        pos["last_price"] = price
+        entry = pos["entry_price"]
+        chg = (price - entry) / entry * 100
+
+        pos["highest_price"] = max(pos.get("highest_price", entry), price)
+        peak = pos["highest_price"]
+
+        tp_pct = pos.get("tp_pct", params["tp_pct"])
+        sl_pct = pos.get("sl_pct", params["sl_pct"])
+        trail_arm = pos.get("trail_arm", params["trail_arm"])
+        trail_dist = pos.get("trail_dist", params["trail_dist"])
 
         reason = None
 
-        if current_price <= stop_loss_price:
-            reason = f"Stop loss dinamico raggiunto ({change_pct:+.2f}%)"
-        else:
-            profit_from_entry_pct = (highest_price - entry_price) / entry_price * 100
-            if profit_from_entry_pct >= CONFIG["TRAIL_ARM_PROFIT_PCT"]:
-                trail_pct = clamp(
-                    entry_volatility * CONFIG["TRAIL_ATR_MULT"],
-                    CONFIG["MIN_TRAIL_PCT"],
-                    CONFIG["MAX_TRAIL_PCT"],
-                )
-                trailing_stop_price = highest_price * (1 - trail_pct / 100)
-                if current_price <= trailing_stop_price:
-                    reason = (
-                        f"Trailing stop attivato (picco {format_price(highest_price)}, "
-                        f"{change_pct:+.2f}% dall'ingresso)"
-                    )
-            if reason is None and current_rsi is not None and current_rsi >= CONFIG["RSI_SELL_THRESHOLD"]:
-                reason = f"RSI in ipercomprato ({current_rsi:.1f})"
+        # 1. Stop loss
+        if chg <= -sl_pct:
+            reason = f"Stop loss ({chg:+.1f}%)"
+
+        # 2. Take profit
+        elif chg >= tp_pct:
+            reason = f"Take profit ({chg:+.1f}%)"
+
+        # 3. Trailing stop
+        elif (peak - entry) / entry * 100 >= trail_arm:
+            drop_from_peak = (peak - price) / peak * 100
+            if drop_from_peak >= trail_dist:
+                reason = f"Trailing stop (picco {fp(peak)}, {chg:+.1f}%)"
 
         if not reason:
-            time.sleep(1)
             continue
 
         order_note = ""
         if trading_enabled():
             try:
-                result = place_market_order(pair_name, "sell", pos["volume"])
-                txid = result.get("txid", ["(validato, nessun txid)"])[0]
-                order_note = f"\nOrdine: {txid} ({mode_label()})"
+                result = place_order(pos["pair"], "sell", pos["volume"])
+                txid = result.get("txid", ["(ok)"])[0]
+                order_note = f"\nOrdine: {txid}"
             except Exception as e:
-                telegram_send(
-                    f"⚠️ ERRORE nell'ordine di VENDITA per {base}: {e}\n"
-                    f"La posizione resta aperta nello stato: verificala manualmente su Kraken."
-                )
-                time.sleep(1)
+                telegram_send(f"⚠️ Errore vendita {base}: {e}")
                 continue
 
-        pnl_eur = (current_price - entry_price) * pos["volume"]
-        state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl_eur
+        pnl = (price - entry) * pos["volume"]
+        state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl
 
-        msg = (
-            f"\U0001F534 VENDI {base}/{CONFIG['QUOTE_CURRENCY']}\n"
-            f"Motivo: {reason}\n"
-            f"Prezzo acquisto: {format_price(entry_price)}\n"
-            f"Prezzo vendita (stimato): {format_price(current_price)}\n"
-            f"Massimo toccato: {format_price(highest_price)}\n"
-            f"Variazione: {change_pct:+.2f}%\n"
-            f"P&L stimato: {pnl_eur:+.2f} EUR"
-            f"{order_note}"
+        telegram_send(
+            f"🔴 <b>VENDI {base}</b>\n"
+            f"{reason}\n"
+            f"{fp(entry)} → {fp(price)} ({chg:+.1f}%)\n"
+            f"P&L: {pnl:+.2f}€ | Cum: {state['cumulative_pnl_eur']:+.2f}€\n"
+            f"{mode_label()}{order_note}",
+            control_buttons(),
         )
-        telegram_send(msg)
-        del open_positions[base]
+        del positions[base]
 
-        if state["cumulative_pnl_eur"] <= -CONFIG["MAX_TOTAL_LOSS_EUR"] and not state.get("trading_paused"):
+        # Kill-switch
+        if state["cumulative_pnl_eur"] <= -CONFIG["MAX_TOTAL_LOSS_EUR"]:
             state["trading_paused"] = True
             telegram_send(
-                f"\U0001F6D1 KILL-SWITCH ATTIVATO: perdita cumulata stimata "
-                f"{state['cumulative_pnl_eur']:.2f} EUR ha superato il limite di "
-                f"{CONFIG['MAX_TOTAL_LOSS_EUR']} EUR.\n"
-                f"Il bot NON aprira' nuove posizioni finche' non imposti manualmente "
-                f"\"trading_paused\": false in state.json su GitHub."
+                f"🛑 KILL-SWITCH: perdita {state['cumulative_pnl_eur']:.2f}€ oltre limite.\n"
+                f"/riprendi per riattivare.",
+                control_buttons(),
             )
-        time.sleep(1)
 
 
-# ================== LOGICA DI ACQUISTO ==================
+# ================== BUY LOGIC (PUMP CATCHER) ==================
 
-def check_buy_signals(open_positions, candidates, state):
-    for c in candidates:
-        if len(open_positions) >= CONFIG["MAX_OPEN_POSITIONS"]:
+def check_pump_buys(positions, pumping_pairs, state, params):
+    """Cerca pump candle + volume surge nelle coppie pre-filtrate dal Ticker."""
+    bought = 0
+    for c in pumping_pairs:
+        if len(positions) >= params["max_pos"]:
             break
         base = c["base"]
-        if base in open_positions:
+        if base in positions:
             continue
+
         try:
-            closes = get_closes(c["pair"])
+            ohlc = get_ohlc(c["pair"])
         except Exception as e:
-            print(f"[ERRORE] {c['pair']}: {e}")
+            print(f"[ERR] OHLC {c['pair']}: {e}")
             continue
 
-        min_len_needed = max(CONFIG["RSI_PERIOD"] + 5, CONFIG["TREND_SMA_PERIOD"])
-        if len(closes) < min_len_needed:
+        closes = ohlc["closes"]
+        opens = ohlc["opens"]
+        volumes = ohlc["volumes"]
+
+        if len(closes) < CONFIG["PUMP_RSI_PERIOD"] + 5:
             continue
 
-        volatility = compute_volatility_pct(closes)
-        if volatility < CONFIG["MIN_VOLATILITY_PCT"]:
+        # Pump candle: ultima candela chiusa forte
+        # Usiamo la penultima (l'ultima potrebbe essere ancora in formazione)
+        idx = -2 if len(closes) > 2 else -1
+        candle_open = opens[idx]
+        candle_close = closes[idx]
+        if candle_open <= 0:
+            continue
+        candle_chg = (candle_close - candle_open) / candle_open * 100
+        if candle_chg < CONFIG["PUMP_CANDLE_MIN_PCT"]:
+            time.sleep(0.5)
             continue
 
-        current_price = closes[-1]
-
-        if CONFIG["TREND_FILTER_ENABLED"]:
-            sma = compute_sma(closes, CONFIG["TREND_SMA_PERIOD"])
-            if sma is None or current_price < sma:
-                # la moneta e' sotto la sua media mobile di fondo: probabile downtrend
-                # strutturale, salta per evitare di "comprare un coltello che cade"
-                time.sleep(1)
-                continue
-
-        rsis = compute_rsi(closes, CONFIG["RSI_PERIOD"])
-        if not rsis or len(rsis) < 2:
+        # Volume surge
+        avg_period = min(20, len(volumes) - 3)
+        if avg_period < 3:
             continue
-        prev_rsi, curr_rsi = rsis[-2], rsis[-1]
-
-        if not (prev_rsi < CONFIG["RSI_BUY_THRESHOLD"] <= curr_rsi):
-            time.sleep(1)
+        avg_vol = sum(volumes[-avg_period - 3:-3]) / avg_period if avg_period > 0 else 0
+        candle_vol = volumes[idx]
+        vol_ratio = candle_vol / avg_vol if avg_vol > 0 else 0
+        if vol_ratio < CONFIG["PUMP_VOLUME_SURGE"]:
+            time.sleep(0.5)
             continue
 
-        raw_volume = CONFIG["EUR_PER_TRADE"] / current_price
-        volume = round_volume(raw_volume, c["lot_decimals"])
+        # RSI check
+        rsis = compute_rsi(closes, CONFIG["PUMP_RSI_PERIOD"])
+        if not rsis:
+            continue
+        rsi = rsis[-1]
+        if rsi > CONFIG["PUMP_RSI_MAX"]:
+            time.sleep(0.5)
+            continue
 
-        if volume <= 0 or volume < c["ordermin"]:
-            print(
-                f"[SKIP] {base}: volume {volume} sotto il minimo Kraken "
-                f"({c['ordermin']}) per {CONFIG['EUR_PER_TRADE']} EUR allocati."
-            )
-            time.sleep(1)
+        # Current price (from last close or ticker data)
+        price = c["last_price"]
+
+        # Volume e ordine
+        eur = params["eur"]
+        raw_vol = eur / price
+        vol = round_vol(raw_vol, c["lot_decimals"])
+        if vol <= 0 or vol < c["ordermin"]:
             continue
 
         order_note = ""
         if trading_enabled():
             try:
-                result = place_market_order(c["pair"], "buy", volume)
-                txid = result.get("txid", ["(validato, nessun txid)"])[0]
-                order_note = f"\nOrdine: {txid} ({mode_label()})"
+                result = place_order(c["pair"], "buy", vol)
+                txid = result.get("txid", ["(ok)"])[0]
+                order_note = f"\nOrdine: {txid}"
             except Exception as e:
-                telegram_send(f"⚠️ ERRORE nell'ordine di ACQUISTO per {base}: {e}")
-                time.sleep(1)
+                telegram_send(f"⚠️ Errore acquisto {base}: {e}")
+                time.sleep(0.5)
                 continue
 
-        stop_loss_pct = clamp(
-            volatility * CONFIG["STOP_LOSS_ATR_MULT"],
-            CONFIG["MIN_STOP_LOSS_PCT"],
-            CONFIG["MAX_STOP_LOSS_PCT"],
-        )
-        stop_loss_price = current_price * (1 - stop_loss_pct / 100)
+        regime = state.get("current_regime", "NEUTRAL")
+        tp = params["tp_pct"]
+        sl = params["sl_pct"]
 
-        change_line = (
-            f"Variazione 24h: {c['change_24h']:+.2f}%\n" if c["change_24h"] is not None else ""
+        telegram_send(
+            f"🚀 <b>COMPRA {base}/{CONFIG['QUOTE_CURRENCY']}</b>\n"
+            f"{REGIME_LABEL.get(regime, regime)}\n"
+            f"Prezzo: {fp(price)} | {eur:.0f}€\n"
+            f"Pump oggi: +{c['change_today_pct']:.1f}% | Candela: +{candle_chg:.1f}%\n"
+            f"Volume: {vol_ratio:.1f}x media | RSI: {rsi:.0f}\n"
+            f"TP: +{tp:.1f}% | SL: -{sl:.1f}% | Trail: +{params['trail_arm']:.0f}%→{params['trail_dist']:.1f}%\n"
+            f"{mode_label()}{order_note}",
+            [[{"text": f"🔴 Vendi {base}", "callback_data": f"vendi_{base.lower()}"}],
+             *control_buttons()],
         )
-        msg = (
-            f"\U0001F7E2 COMPRA {base}/{CONFIG['QUOTE_CURRENCY']}\n"
-            f"Prezzo attuale: {format_price(current_price)}\n"
-            f"Volume: {volume} {base} (~{CONFIG['EUR_PER_TRADE']:.0f} EUR)\n"
-            f"RSI: {curr_rsi:.1f} (risalito da {prev_rsi:.1f})\n"
-            f"Volatilita' recente: {volatility:.1f}%\n"
-            f"Stop loss dinamico: {format_price(stop_loss_price)} (-{stop_loss_pct:.1f}%)\n"
-            f"Rank market cap: #{c['rank']}\n"
-            f"{change_line}"
-            f"Modalita': {mode_label()}"
-            f"{order_note}"
-        )
-        telegram_send(msg)
-        open_positions[base] = {
+
+        positions[base] = {
             "pair": c["pair"],
-            "entry_price": current_price,
-            "volume": volume,
+            "entry_price": price,
+            "volume": vol,
             "entry_time": datetime.now(timezone.utc).isoformat(),
-            "volatility_pct": volatility,
-            "highest_price": current_price,
-            "stop_loss_price": stop_loss_price,
+            "highest_price": price,
+            "last_price": price,
+            "tp_pct": tp,
+            "sl_pct": sl,
+            "trail_arm": params["trail_arm"],
+            "trail_dist": params["trail_dist"],
+            "strategy": "pump",
         }
-        time.sleep(1)
+        bought += 1
+        time.sleep(0.5)
+
+    return bought
 
 
-# ================== CICLO PRINCIPALE ==================
+# ================== MAIN ==================
 
 def run():
     state = load_state()
-    open_positions = state.get("open_positions", {})
+    positions = state.get("open_positions", {})
 
-    print("Controllo comandi Telegram (/pausa, /riprendi, /stato, /vendi_tutto)...")
+    print("Telegram commands...")
     check_telegram_commands(state)
 
-    print(f"Modalita' attuale: {mode_label()}")
-    print("Recupero elenco coppie Kraken in EUR...")
-    kraken_pairs = get_kraken_eur_pairs()
-    print(f"Trovate {len(kraken_pairs)} coppie {CONFIG['QUOTE_CURRENCY']} su Kraken.")
+    # Regime
+    regime, fgi, btc = detect_regime()
+    params = get_params(regime)
+    state["current_regime"] = regime
+    state["last_fgi"] = fgi
+    print(f"Regime: {REGIME_LABEL.get(regime)} | {params['eur']}€/trade, max {params['max_pos']} pos")
+    print(f"Mode: {mode_label()}")
 
-    print("Recupero dati di mercato da CoinGecko...")
-    market_data = get_coingecko_market_data()
+    # Scan ALL pairs
+    all_pairs = get_all_eur_pairs()
+    print(f"{len(all_pairs)} coppie EUR su Kraken")
 
-    candidates = build_candidate_universe(kraken_pairs, market_data)
-    print(f"{len(candidates)} candidati dopo i filtri di rank/pump.")
+    tickers = get_ticker_batch(all_pairs.keys())
+    print(f"Ticker ricevuto per {len(tickers)} coppie")
 
-    check_sell_signals(open_positions, state)
+    # Pre-filter: chi sta pompando?
+    pumping = scan_pumping_pairs(all_pairs, tickers)
+    print(f"{len(pumping)} coppie con pump attivo (>{CONFIG['MIN_TICKER_CHANGE_PCT']}% oggi)")
+    if pumping:
+        top5 = ", ".join(f"{p['base']}(+{p['change_today_pct']:.0f}%)" for p in pumping[:5])
+        print(f"  Top: {top5}")
 
+    # Sells
+    check_sells(positions, tickers, state, params)
+
+    # Buys
     if state.get("trading_paused"):
-        print("Trading in pausa (kill-switch attivo): nessuna nuova posizione verra' aperta.")
-    elif len(open_positions) < CONFIG["MAX_OPEN_POSITIONS"]:
-        check_buy_signals(open_positions, candidates, state)
+        print("Trading in pausa.")
+    elif len(positions) < params["max_pos"]:
+        n = check_pump_buys(positions, pumping, state, params)
+        if n:
+            print(f"Aperte {n} nuove posizioni")
+        else:
+            print("Nessun pump entry signal scattato")
 
+    # Heartbeat
     today = datetime.now(timezone.utc).date().isoformat()
     if state.get("last_heartbeat_date") != today:
+        btc_arrow = "↑" if btc else "↓" if btc is False else "?"
+        pos_summary = ""
+        if positions:
+            pos_summary = "\n" + "\n".join(
+                f"• {b}: {((p.get('last_price',p['entry_price'])-p['entry_price'])/p['entry_price']*100):+.1f}%"
+                for b, p in positions.items()
+            )
         telegram_send(
-            f"✅ Bot attivo ({mode_label()}) — {len(open_positions)} posizioni aperte, "
-            f"{len(candidates)} candidati monitorati oggi, "
-            f"P&L cumulato stimato: {state.get('cumulative_pnl_eur', 0.0):+.2f} EUR."
-            + (" IN PAUSA (kill-switch)." if state.get("trading_paused") else "")
+            f"✅ <b>Bot v4 ({mode_label()})</b>\n"
+            f"{REGIME_LABEL.get(regime, regime)}\n"
+            f"F&G: {fgi if fgi is not None else '?'} | BTC: {btc_arrow}\n"
+            f"{params['eur']:.0f}€/trade | max {params['max_pos']} pos\n"
+            f"Pump attivi: {len(pumping)} | Posizioni: {len(positions)}\n"
+            f"P&L: {state.get('cumulative_pnl_eur', 0.0):+.2f}€"
+            f"{pos_summary}"
+            + ("\n⚠️ PAUSA" if state.get("trading_paused") else ""),
+            control_buttons(),
         )
         state["last_heartbeat_date"] = today
 
-    state["open_positions"] = open_positions
+    state["open_positions"] = positions
     save_state(state)
-    print("Esecuzione completata.")
+    print("Done.")
 
 
 if __name__ == "__main__":
