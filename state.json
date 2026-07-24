@@ -1,21 +1,7 @@
 {
-  "open_positions": {
-    "ZEX": {
-      "pair": "ZEXEUR",
-      "entry_price": 0.002434,
-      "volume": 7189.81101,
-      "entry_time": "2026-07-24T16:51:27.336069+00:00",
-      "highest_price": 0.002434,
-      "last_price": 0.002434,
-      "tp_pct": 8.0,
-      "sl_pct": 5.6,
-      "trail_arm": 5.0,
-      "trail_dist": 3.0,
-      "strategy": "pump"
-    }
-  },
+  "open_positions": {},
   "last_heartbeat_date": "2026-07-24",
-  "cumulative_pnl_eur": -2.128378377600002,
+  "cumulative_pnl_eur": -4.867696372410001,
   "trading_paused": false,
   "telegram_update_offset": 64929745,
   "current_regime": "BEAR_DEFENSIVE",
