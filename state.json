@@ -17,6 +17,22 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
+    "INX": {
+      "pair": "INXEUR",
+      "entry_price": 0.006349,
+      "volume": 2756.33958,
+      "entry_time": "2026-07-24T23:46:42.540494+00:00",
+      "highest_price": 0.006349,
+      "last_price": 0.006332,
+      "tp_pct": 8.0,
+      "sl_pct": 8.0,
+      "tp_price": 0.00685692,
+      "sl_price": 0.00584108,
+      "trail_arm": 5.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 15,
+      "strategy": "pump"
+    },
     "GFI": {
       "pair": "GFIEUR",
       "asset_code": "GFI",
@@ -34,22 +50,6 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "INX": {
-      "pair": "INXEUR",
-      "entry_price": 0.006349,
-      "volume": 2756.33958,
-      "entry_time": "2026-07-24T23:46:42.540494+00:00",
-      "highest_price": 0.006349,
-      "last_price": 0.006332,
-      "tp_pct": 8.0,
-      "sl_pct": 8.0,
-      "tp_price": 0.00685692,
-      "sl_price": 0.00584108,
-      "trail_arm": 5.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 15,
-      "strategy": "pump"
-    },
     "AVAX": {
       "pair": "AVAXEUR",
       "asset_code": "AVAX",
@@ -57,7 +57,7 @@
       "volume": 2.7157817,
       "entry_time": "2026-07-25T13:51:49.959516+00:00",
       "highest_price": 5.774,
-      "last_price": 5.735,
+      "last_price": 5.742,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 6.368320000000001,
@@ -74,7 +74,7 @@
   "telegram_update_offset": 64929762,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
-  "last_run_time": "2026-07-25T14:24:20.923125+00:00",
+  "last_run_time": "2026-07-25T14:24:42.320128+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
