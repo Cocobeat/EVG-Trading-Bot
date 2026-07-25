@@ -56,6 +56,7 @@ USER_PROFILES = {
         "min_ticker_change_pct": 2.0,
         "min_hold_minutes": 20,
         "max_spread_pct": 1.5,
+        "min_volume_eur": 5000,
         "desc": "Pochi trade, protezione capitale",
     },
     "medio": {
@@ -73,6 +74,7 @@ USER_PROFILES = {
         "min_ticker_change_pct": 1.0,
         "min_hold_minutes": 15,
         "max_spread_pct": 2.0,
+        "min_volume_eur": 3000,
         "desc": "Bilanciato rischio/rendimento",
     },
     "aggressivo": {
@@ -83,13 +85,14 @@ USER_PROFILES = {
         "stop_loss_pct": 12.0,
         "trail_arm_pct": 4.0,
         "trail_distance_pct": 3.0,
-        "pump_candle_min_pct": 0.8,
-        "pump_volume_surge": 1.2,
-        "pump_rsi_max": 92,
+        "pump_candle_min_pct": 0.6,
+        "pump_volume_surge": 1.1,
+        "pump_rsi_max": 97,
         "max_total_loss_eur": 80.0,
         "min_ticker_change_pct": 0.5,
         "min_hold_minutes": 10,
-        "max_spread_pct": 3.0,
+        "max_spread_pct": 5.0,
+        "min_volume_eur": 1200,
         "desc": "Entra su tutto, massima esposizione",
     },
 }
@@ -100,7 +103,6 @@ CONFIG = {
     "QUOTE_CURRENCY": "EUR",
     "SCAN_TIMEFRAME": 5,
     "SCAN_LOOKBACK": 60,
-    "MIN_24H_VOLUME_EUR": 5000,
     "MAX_DAILY_PUMP_PCT": 50.0,
     "RSI_PERIOD": 14,
     "COOLDOWN_MINUTES": 60,
@@ -171,6 +173,7 @@ def get_params(regime, state):
         "min_ticker_chg": up["min_ticker_change_pct"],
         "min_hold_min": up.get("min_hold_minutes", 15),
         "max_spread": up.get("max_spread_pct", 2.0),
+        "min_vol_eur": up.get("min_volume_eur", 5000),
     }
 
 
@@ -716,7 +719,7 @@ def scan_pumping(all_pairs, tickers, params, state):
 
         # Volume 24h in EUR
         vol_eur = float(tick["v"][1]) * last_price
-        if vol_eur < CONFIG["MIN_24H_VOLUME_EUR"]:
+        if vol_eur < params["min_vol_eur"]:
             skipped_vol += 1
             continue
 
@@ -1047,7 +1050,7 @@ def _run_body(state):
     pumping = scan_pumping(all_pairs, tickers, params, state)
     print(f"{len(pumping)} pump qualificati "
           f"({params['min_ticker_chg']}%-{CONFIG['MAX_DAILY_PUMP_PCT']}%, "
-          f"vol>{CONFIG['MIN_24H_VOLUME_EUR']}€, spread<{params['max_spread']}%)")
+          f"vol>{params['min_vol_eur']}€, spread<{params['max_spread']}%)")
     if pumping:
         top = ", ".join(
             f"{p['base']}(+{p['change_today_pct']:.0f}%,{p['vol_eur']:.0f}€,"
@@ -1088,7 +1091,7 @@ def _run_body(state):
             f"TP +{params['tp_pct']:.0f}% SL -{params['sl_pct']:.0f}%\n"
             f"Trail: {params['trail_arm']}%/{params['trail_dist']}% | "
             f"Hold: {params['min_hold_min']}min | Spread <{params['max_spread']}%\n"
-            f"Vol min: {CONFIG['MIN_24H_VOLUME_EUR']}€ | "
+            f"Vol min: {params['min_vol_eur']}€ | "
             f"Anti-FOMO: <{CONFIG['MAX_DAILY_PUMP_PCT']:.0f}% | "
             f"Max buy/run: {CONFIG['MAX_BUYS_PER_RUN']}\n"
             f"Pump: {len(pumping)} | Pos: {len(positions)} | "
