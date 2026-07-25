@@ -1,12 +1,24 @@
 """
-Bot di trading v4.2 — Pump Catcher
+Bot di trading v5.0 — Pump Catcher Pro
 
-Novita' rispetto a v4.1:
-  - Anti-FOMO: non entra su coin gia' pompate oltre MAX_DAILY_PUMP_PCT
-  - SL floor: il regime non stringe mai lo SL sotto il valore base del profilo
-  - Min hold: SL non si attiva nei primi MIN_HOLD_MINUTES (evita vendite su dip)
-  - SL/TP fissati come prezzo all'entry (non cambiano con il regime)
-  - Save atomico su state.json
+Logica:
+  1. Scansiona TUTTE le coppie EUR su Kraken via Ticker batch
+  2. Filtra pump per variazione giornaliera, volume, spread
+  3. Deep-dive OHLC: candela pump + volume surge + RSI
+  4. Entry con SL/TP/trailing fissati come prezzo all'acquisto
+  5. SL ritardato (min hold) per assorbire dip temporanei
+  6. Cooldown per coin dopo SL (no re-entry su stessa coin)
+  7. Max 1 acquisto per run (riduce correlazione)
+  8. Regime detection (F&G + BTC) scala i parametri
+  9. 3 profili rischio switchabili da Telegram
+
+Protezioni:
+  - Anti-FOMO: ignora coin gia' oltre +50% giornaliero
+  - Spread check: ignora coin con spread > 2%
+  - Volume minimo: 5000 EUR/24h (liquidita' reale)
+  - SL floor: il regime non stringe mai lo SL sotto il base
+  - Kill-switch: pausa automatica oltre la soglia di perdita
+  - Save atomico: protegge state.json da corruzione
 """
 
 import base64
@@ -15,7 +27,6 @@ import hmac
 import json
 import math
 import os
-import tempfile
 import time
 import urllib.parse
 from datetime import datetime, timezone
@@ -31,14 +42,15 @@ USER_PROFILES = {
         "max_open_positions": 2,
         "take_profit_pct": 5.0,
         "stop_loss_pct": 4.0,
-        "trail_arm_pct": 3.0,
-        "trail_distance_pct": 2.0,
-        "pump_candle_min_pct": 1.5,
-        "pump_volume_surge": 1.5,
-        "pump_rsi_max": 80,
+        "trail_arm_pct": 2.5,
+        "trail_distance_pct": 1.5,
+        "pump_candle_min_pct": 2.0,
+        "pump_volume_surge": 2.0,
+        "pump_rsi_max": 75,
         "max_total_loss_eur": 25.0,
-        "min_ticker_change_pct": 1.5,
+        "min_ticker_change_pct": 2.0,
         "min_hold_minutes": 20,
+        "max_spread_pct": 1.5,
         "desc": "Pochi trade, protezione capitale",
     },
     "medio": {
@@ -47,14 +59,15 @@ USER_PROFILES = {
         "max_open_positions": 4,
         "take_profit_pct": 10.0,
         "stop_loss_pct": 8.0,
-        "trail_arm_pct": 5.0,
-        "trail_distance_pct": 3.0,
+        "trail_arm_pct": 3.0,
+        "trail_distance_pct": 2.0,
         "pump_candle_min_pct": 1.5,
         "pump_volume_surge": 1.5,
         "pump_rsi_max": 85,
         "max_total_loss_eur": 50.0,
         "min_ticker_change_pct": 1.0,
         "min_hold_minutes": 15,
+        "max_spread_pct": 2.0,
         "desc": "Bilanciato rischio/rendimento",
     },
     "aggressivo": {
@@ -64,13 +77,14 @@ USER_PROFILES = {
         "take_profit_pct": 15.0,
         "stop_loss_pct": 12.0,
         "trail_arm_pct": 4.0,
-        "trail_distance_pct": 3.5,
-        "pump_candle_min_pct": 0.5,
-        "pump_volume_surge": 1.0,
-        "pump_rsi_max": 95,
+        "trail_distance_pct": 3.0,
+        "pump_candle_min_pct": 0.8,
+        "pump_volume_surge": 1.2,
+        "pump_rsi_max": 92,
         "max_total_loss_eur": 80.0,
         "min_ticker_change_pct": 0.5,
         "min_hold_minutes": 10,
+        "max_spread_pct": 3.0,
         "desc": "Entra su tutto, massima esposizione",
     },
 }
@@ -81,9 +95,11 @@ CONFIG = {
     "QUOTE_CURRENCY": "EUR",
     "SCAN_TIMEFRAME": 5,
     "SCAN_LOOKBACK": 60,
-    "MIN_24H_VOLUME_EUR": 100,
+    "MIN_24H_VOLUME_EUR": 5000,
     "MAX_DAILY_PUMP_PCT": 50.0,
     "RSI_PERIOD": 14,
+    "COOLDOWN_MINUTES": 60,
+    "MAX_BUYS_PER_RUN": 1,
 
     "FGI_BULL_THRESHOLD": 55,
     "FGI_BEAR_THRESHOLD": 35,
@@ -96,9 +112,6 @@ CONFIG = {
     "TICKER_BATCH_SIZE": 80,
 }
 
-# Regime scala i valori del profilo.
-# NOTA: sl_mult ha un floor a 1.0 — il regime puo' allargare lo SL
-# (piu' spazio in bull) ma non stringerlo (evita uscite premature).
 RISK_PROFILES = {
     "BULL_AGGRESSIVE": {"eur_mult": 1.3, "pos_add": 2, "tp_mult": 1.2, "sl_mult": 1.3},
     "BULL_MODERATE":   {"eur_mult": 1.15, "pos_add": 1, "tp_mult": 1.1, "sl_mult": 1.1},
@@ -130,7 +143,6 @@ def get_user_profile(state):
 def get_params(regime, state):
     up, _ = get_user_profile(state)
     rp = RISK_PROFILES.get(regime, RISK_PROFILES["NEUTRAL"])
-    # SL floor: il regime non riduce mai lo SL sotto il valore base del profilo
     sl_mult = max(1.0, rp["sl_mult"])
     return {
         "eur": round(up["eur_per_trade"] * rp["eur_mult"], 2),
@@ -145,6 +157,7 @@ def get_params(regime, state):
         "max_loss": up["max_total_loss_eur"],
         "min_ticker_chg": up["min_ticker_change_pct"],
         "min_hold_min": up.get("min_hold_minutes", 15),
+        "max_spread": up.get("max_spread_pct", 2.0),
     }
 
 
@@ -239,11 +252,12 @@ def handle_command(text, state):
             state["user_profile"] = name
             up = USER_PROFILES[name]
             telegram_send(
-                f"✅ Profilo cambiato: {up['label']}\n"
+                f"✅ Profilo: {up['label']}\n"
                 f"{up['desc']}\n"
-                f"TP: +{up['take_profit_pct']}% | SL: -{up['stop_loss_pct']}% | "
+                f"TP +{up['take_profit_pct']}% | SL -{up['stop_loss_pct']}% | "
+                f"Trail {up['trail_arm_pct']}%/{up['trail_distance_pct']}%\n"
                 f"Max pos: {up['max_open_positions']} | Max loss: {up['max_total_loss_eur']}€\n"
-                f"Hold minimo: {up.get('min_hold_minutes', 15)} min prima dello SL",
+                f"Spread max: {up.get('max_spread_pct', 2)}% | Hold: {up.get('min_hold_minutes', 15)}min",
                 all_buttons(state),
             )
 
@@ -254,7 +268,7 @@ def handle_command(text, state):
             marker = " ← attivo" if name == current else ""
             lines.append(
                 f"{p['label']}: TP +{p['take_profit_pct']}%, SL -{p['stop_loss_pct']}%, "
-                f"{p['max_open_positions']} pos, hold {p.get('min_hold_minutes', 15)}min{marker}"
+                f"trail {p['trail_arm_pct']}%, {p['max_open_positions']} pos{marker}"
             )
         telegram_send("\n".join(lines), profile_buttons() + control_buttons())
 
@@ -262,12 +276,15 @@ def handle_command(text, state):
 def send_status(state):
     pos = state.get("open_positions", {})
     regime = state.get("current_regime", "NEUTRAL")
-    up, pname = get_user_profile(state)
+    up, _ = get_user_profile(state)
     fgi = state.get("last_fgi")
+    cooldowns = state.get("cooldowns", {})
     lines = [
-        f"{'⏸ PAUSA' if state.get('trading_paused') else '▶️ Attivo'} | {REGIME_LABEL.get(regime, regime)}",
+        f"{'⏸ PAUSA' if state.get('trading_paused') else '▶️ Attivo'} | "
+        f"{REGIME_LABEL.get(regime, regime)}",
         f"Profilo: {up['label']} | F&G: {fgi if fgi is not None else '?'}",
-        f"P&L: {state.get('cumulative_pnl_eur', 0.0):+.2f}€ / max loss: -{up['max_total_loss_eur']}€",
+        f"P&L: {state.get('cumulative_pnl_eur', 0.0):+.2f}€ / "
+        f"max loss: -{up['max_total_loss_eur']}€",
     ]
     btns = []
     if pos:
@@ -275,17 +292,21 @@ def send_status(state):
         for base, p in pos.items():
             price = p.get("last_price", p["entry_price"])
             chg = (price - p["entry_price"]) / p["entry_price"] * 100
-            sl_p = p.get("sl_price")
             hold = minutes_held(p)
             hold_min = p.get("min_hold_min", 15)
-            sl_status = f"SL attivo" if hold >= hold_min else f"SL tra {hold_min - hold}min"
+            armed = (p.get("highest_price", price) - p["entry_price"]) / p["entry_price"] * 100
+            trail_status = "\U0001F7E2 trail" if armed >= p.get("trail_arm", 3) else ""
+            sl_status = "SL attivo" if hold >= hold_min else f"SL tra {max(0, int(hold_min - hold))}min"
             lines.append(
-                f"• {base}: {chg:+.1f}% | {sl_status}"
-                + (f" | SL: {fp(sl_p)}" if sl_p else "")
+                f"• {base}: {chg:+.1f}% | {sl_status} {trail_status}"
             )
             btns.append([{"text": f"Vendi {base}", "callback_data": f"vendi_{base.lower()}"}])
     else:
         lines.append("\nNessuna posizione aperta.")
+    if cooldowns:
+        active = [f"{b}({int(v)}m)" for b, v in cooldowns.items() if v > 0]
+        if active:
+            lines.append(f"\nCooldown: {', '.join(active)}")
     btns.extend(profile_buttons())
     btns.extend(control_buttons())
     telegram_send("\n".join(lines), btns)
@@ -340,6 +361,35 @@ def round_vol(v, dec):
     return math.floor(v * f) / f
 
 
+def update_cooldowns(state):
+    """Decrementa cooldown e rimuovi quelli scaduti."""
+    cooldowns = state.get("cooldowns", {})
+    to_remove = [b for b, mins in cooldowns.items() if mins <= 0]
+    for b in to_remove:
+        del cooldowns[b]
+    state["cooldowns"] = cooldowns
+
+
+def add_cooldown(state, base):
+    """Aggiunge cooldown per una coin dopo SL."""
+    cooldowns = state.get("cooldowns", {})
+    cooldowns[base] = CONFIG["COOLDOWN_MINUTES"]
+    state["cooldowns"] = cooldowns
+
+
+def is_on_cooldown(state, base):
+    """Controlla se una coin e' in cooldown."""
+    return state.get("cooldowns", {}).get(base, 0) > 0
+
+
+def tick_cooldowns(state, elapsed_minutes):
+    """Scala i cooldown del tempo trascorso."""
+    cooldowns = state.get("cooldowns", {})
+    for base in list(cooldowns.keys()):
+        cooldowns[base] = max(0, cooldowns[base] - elapsed_minutes)
+    state["cooldowns"] = cooldowns
+
+
 # ================== CHIUSURA POSIZIONI ==================
 
 def force_close_all(state):
@@ -392,6 +442,7 @@ def load_state():
         "cumulative_pnl_eur": 0.0, "trading_paused": False,
         "telegram_update_offset": 0, "current_regime": "NEUTRAL",
         "last_fgi": None, "user_profile": "medio",
+        "cooldowns": {}, "last_run_time": None,
     }
 
 
@@ -568,30 +619,64 @@ def compute_rsi(closes, period=14):
 
 # ================== SCAN ==================
 
-def scan_pumping(all_pairs, tickers, params):
+def scan_pumping(all_pairs, tickers, params, state):
     pumping = []
     min_chg = params["min_ticker_chg"]
     max_chg = CONFIG["MAX_DAILY_PUMP_PCT"]
+    max_spread = params["max_spread"]
+    skipped_vol = 0
+    skipped_spread = 0
+    skipped_cooldown = 0
+
     for pair_name, info in all_pairs.items():
         tick = tickers.get(pair_name)
         if not tick:
             continue
+
         last_price = float(tick["c"][0])
         open_price = float(tick["o"])
-        if open_price <= 0:
+        if open_price <= 0 or last_price <= 0:
             continue
+
+        # Volume 24h in EUR
         vol_eur = float(tick["v"][1]) * last_price
         if vol_eur < CONFIG["MIN_24H_VOLUME_EUR"]:
+            skipped_vol += 1
             continue
+
+        # Variazione giornaliera
         chg = (last_price - open_price) / open_price * 100
         if chg < min_chg or chg > max_chg:
             continue
+
+        # Spread bid-ask
+        ask = float(tick["a"][0])
+        bid = float(tick["b"][0])
+        if bid > 0:
+            spread = (ask - bid) / bid * 100
+            if spread > max_spread:
+                skipped_spread += 1
+                continue
+        else:
+            continue
+
+        # Cooldown
+        base = info["base"]
+        if is_on_cooldown(state, base):
+            skipped_cooldown += 1
+            continue
+
         pumping.append({
-            "pair": pair_name, "base": info["base"],
+            "pair": pair_name, "base": base,
             "ordermin": info["ordermin"], "lot_decimals": info["lot_decimals"],
-            "last_price": last_price, "change_today_pct": chg, "vol_eur": vol_eur,
+            "last_price": last_price, "change_today_pct": chg,
+            "vol_eur": vol_eur, "spread_pct": spread,
         })
+
     pumping.sort(key=lambda x: x["change_today_pct"], reverse=True)
+    if skipped_vol or skipped_spread or skipped_cooldown:
+        print(f"  Filtrati: {skipped_vol} vol basso, {skipped_spread} spread alto, "
+              f"{skipped_cooldown} cooldown")
     return pumping
 
 
@@ -610,17 +695,16 @@ def check_sells(positions, tickers, state, params):
         pos["highest_price"] = max(pos.get("highest_price", entry), price)
         peak = pos["highest_price"]
 
-        # Prezzi soglia fissati all'entry
         sl_price = pos.get("sl_price", entry * (1 - pos.get("sl_pct", params["sl_pct"]) / 100))
         tp_price = pos.get("tp_price", entry * (1 + pos.get("tp_pct", params["tp_pct"]) / 100))
         t_arm = pos.get("trail_arm", params["trail_arm"])
         t_dist = pos.get("trail_dist", params["trail_dist"])
 
-        # Minuti dall'acquisto
         hold = minutes_held(pos)
         hold_min = pos.get("min_hold_min", params["min_hold_min"])
 
         reason = None
+        is_loss = False
 
         # TP e trailing attivi sempre
         if price >= tp_price:
@@ -633,6 +717,7 @@ def check_sells(positions, tickers, state, params):
         # SL attivo solo dopo min_hold_minutes
         if not reason and hold >= hold_min and price <= sl_price:
             reason = f"Stop loss ({chg:+.1f}%)"
+            is_loss = True
 
         if not reason:
             continue
@@ -659,11 +744,16 @@ def check_sells(positions, tickers, state, params):
         )
         del positions[base]
 
+        # Cooldown dopo SL
+        if is_loss:
+            add_cooldown(state, base)
+            print(f"  Cooldown {base}: {CONFIG['COOLDOWN_MINUTES']}min")
+
         if state["cumulative_pnl_eur"] <= -params["max_loss"]:
             state["trading_paused"] = True
             telegram_send(
-                f"\U0001F6D1 KILL-SWITCH: {state['cumulative_pnl_eur']:.2f}€ oltre -{params['max_loss']}€\n"
-                f"/riprendi per riattivare.",
+                f"\U0001F6D1 KILL-SWITCH: {state['cumulative_pnl_eur']:.2f}€ "
+                f"oltre -{params['max_loss']}€\n/riprendi per riattivare.",
                 all_buttons(state),
             )
 
@@ -672,7 +762,11 @@ def check_sells(positions, tickers, state, params):
 
 def check_buys(positions, pumping, state, params):
     bought = 0
+    max_buys = CONFIG["MAX_BUYS_PER_RUN"]
+
     for c in pumping:
+        if bought >= max_buys:
+            break
         if len(positions) >= params["max_pos"]:
             break
         base = c["base"]
@@ -713,7 +807,7 @@ def check_buys(positions, pumping, state, params):
             time.sleep(0.3)
             continue
 
-        # RSI (escludi ultima candela in formazione)
+        # RSI (solo candele chiuse)
         rsi_closes = closes[:-1] if len(closes) > CONFIG["RSI_PERIOD"] + 3 else closes
         rsis = compute_rsi(rsi_closes, CONFIG["RSI_PERIOD"])
         if not rsis:
@@ -746,7 +840,6 @@ def check_buys(positions, pumping, state, params):
         tp = params["tp_pct"]
         sl = params["sl_pct"]
 
-        # Prezzi fissi all'entry
         sl_price = price * (1 - sl / 100)
         tp_price = price * (1 + tp / 100)
 
@@ -754,9 +847,11 @@ def check_buys(positions, pumping, state, params):
             f"\U0001F680 <b>COMPRA {base}/{CONFIG['QUOTE_CURRENCY']}</b>\n"
             f"{REGIME_LABEL.get(regime, '')} | {up['label']}\n"
             f"Prezzo: {fp(price)} | {eur:.0f}€\n"
-            f"Pump: +{c['change_today_pct']:.1f}% oggi | Candela: +{candle_chg:.1f}%\n"
-            f"Vol: {vol_ratio:.1f}x | RSI: {rsi:.0f}\n"
+            f"Pump: +{c['change_today_pct']:.1f}% | Candela: +{candle_chg:.1f}% | "
+            f"Spread: {c['spread_pct']:.1f}%\n"
+            f"Vol 24h: {c['vol_eur']:.0f}€ | Surge: {vol_ratio:.1f}x | RSI: {rsi:.0f}\n"
             f"TP: {fp(tp_price)} (+{tp:.1f}%) | SL: {fp(sl_price)} (-{sl:.1f}%)\n"
+            f"Trail: {params['trail_arm']}%/{params['trail_dist']}% | "
             f"SL attivo tra {params['min_hold_min']}min\n"
             f"{mode_label()}{order_note}",
             [[{"text": f"\U0001F534 Vendi {base}", "callback_data": f"vendi_{base.lower()}"}],
@@ -784,6 +879,19 @@ def run():
     state = load_state()
     positions = state.get("open_positions", {})
 
+    # Calcola tempo trascorso per cooldown
+    now_iso = datetime.now(timezone.utc).isoformat()
+    last_run = state.get("last_run_time")
+    if last_run:
+        try:
+            elapsed = (datetime.fromisoformat(now_iso) -
+                       datetime.fromisoformat(last_run)).total_seconds() / 60.0
+            tick_cooldowns(state, elapsed)
+        except Exception:
+            pass
+    state["last_run_time"] = now_iso
+    update_cooldowns(state)
+
     print("Telegram...")
     check_telegram_commands(state)
 
@@ -792,10 +900,11 @@ def run():
     state["current_regime"] = regime
     state["last_fgi"] = fgi
 
-    up, pname = get_user_profile(state)
+    up, _ = get_user_profile(state)
     print(f"Profilo: {up['label']} | Regime: {REGIME_LABEL.get(regime)}")
     print(f"Params: {params['eur']}€, max {params['max_pos']} pos, "
-          f"TP +{params['tp_pct']}%, SL -{params['sl_pct']}%, hold {params['min_hold_min']}min")
+          f"TP +{params['tp_pct']}%, SL -{params['sl_pct']}%, "
+          f"hold {params['min_hold_min']}min, spread <{params['max_spread']}%")
     print(f"Mode: {mode_label()}")
 
     all_pairs = get_all_eur_pairs()
@@ -804,10 +913,16 @@ def run():
     tickers = get_ticker_batch(all_pairs.keys())
     print(f"Ticker: {len(tickers)} coppie")
 
-    pumping = scan_pumping(all_pairs, tickers, params)
-    print(f"{len(pumping)} pump attivi ({params['min_ticker_chg']}%-{CONFIG['MAX_DAILY_PUMP_PCT']}%)")
+    pumping = scan_pumping(all_pairs, tickers, params, state)
+    print(f"{len(pumping)} pump qualificati "
+          f"({params['min_ticker_chg']}%-{CONFIG['MAX_DAILY_PUMP_PCT']}%, "
+          f"vol>{CONFIG['MIN_24H_VOLUME_EUR']}€, spread<{params['max_spread']}%)")
     if pumping:
-        top = ", ".join(f"{p['base']}(+{p['change_today_pct']:.0f}%)" for p in pumping[:5])
+        top = ", ".join(
+            f"{p['base']}(+{p['change_today_pct']:.0f}%,{p['vol_eur']:.0f}€,"
+            f"sp{p['spread_pct']:.1f}%)"
+            for p in pumping[:5]
+        )
         print(f"  Top: {top}")
 
     check_sells(positions, tickers, state, params)
@@ -818,26 +933,35 @@ def run():
         n = check_buys(positions, pumping, state, params)
         print(f"Aperte {n} posizioni" if n else "Nessun entry")
 
-    # Heartbeat
+    # Heartbeat giornaliero
     today = datetime.now(timezone.utc).date().isoformat()
     if state.get("last_heartbeat_date") != today:
         btc_arr = "↑" if btc else "↓" if btc is False else "?"
         pos_lines = ""
         if positions:
             pos_lines = "\n" + "\n".join(
-                f"• {b}: {((p.get('last_price',p['entry_price'])-p['entry_price'])/p['entry_price']*100):+.1f}%"
+                f"• {b}: "
+                f"{((p.get('last_price', p['entry_price']) - p['entry_price']) / p['entry_price'] * 100):+.1f}%"
                 for b, p in positions.items()
             )
+        cooldowns = state.get("cooldowns", {})
+        cd_info = ""
+        if cooldowns:
+            cd_info = f"\nCooldown: {len(cooldowns)} coin"
+
         telegram_send(
-            f"✅ <b>Bot v4.2 ({mode_label()})</b>\n"
+            f"✅ <b>Bot v5.0 ({mode_label()})</b>\n"
             f"{REGIME_LABEL.get(regime, regime)} | {up['label']}\n"
             f"F&G: {fgi if fgi is not None else '?'} | BTC: {btc_arr}\n"
             f"{params['eur']:.0f}€/trade | max {params['max_pos']} pos | "
             f"TP +{params['tp_pct']:.0f}% SL -{params['sl_pct']:.0f}%\n"
-            f"Anti-FOMO: max +{CONFIG['MAX_DAILY_PUMP_PCT']:.0f}% | "
-            f"Hold: {params['min_hold_min']}min\n"
+            f"Trail: {params['trail_arm']}%/{params['trail_dist']}% | "
+            f"Hold: {params['min_hold_min']}min | Spread <{params['max_spread']}%\n"
+            f"Vol min: {CONFIG['MIN_24H_VOLUME_EUR']}€ | "
+            f"Anti-FOMO: <{CONFIG['MAX_DAILY_PUMP_PCT']:.0f}% | "
+            f"Max buy/run: {CONFIG['MAX_BUYS_PER_RUN']}\n"
             f"Pump: {len(pumping)} | Pos: {len(positions)} | "
-            f"P&L: {state.get('cumulative_pnl_eur', 0.0):+.2f}€{pos_lines}"
+            f"P&L: {state.get('cumulative_pnl_eur', 0.0):+.2f}€{pos_lines}{cd_info}"
             + ("\n⚠️ PAUSA" if state.get("trading_paused") else ""),
             all_buttons(state),
         )
