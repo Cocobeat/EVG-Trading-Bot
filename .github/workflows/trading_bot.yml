@@ -58,3 +58,10 @@ jobs:
           done
           echo "Push fallito dopo 5 tentativi"
           exit 1
+
+      - name: Alert su fallimento salvataggio stato
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="⚠️ ATTENZIONE: il run del bot e' fallito (bot.py o salvataggio state.json). Controlla i log su GitHub Actions — potrebbe esserci una posizione non tracciata correttamente."
