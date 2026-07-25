@@ -16,23 +16,6 @@
       "min_hold_min": 15,
       "strategy": "pump"
     },
-    "TEL": {
-      "pair": "TELEUR",
-      "asset_code": "TEL",
-      "entry_price": 0.001508,
-      "volume": 13883.95225464,
-      "entry_time": "2026-07-25T13:31:15.115651+00:00",
-      "highest_price": 0.001523,
-      "last_price": 0.001515,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.0016889600000000002,
-      "sl_price": 0.00132704,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "AVAX": {
       "pair": "AVAXEUR",
       "asset_code": "AVAX",
@@ -40,7 +23,7 @@
       "volume": 2.7157817,
       "entry_time": "2026-07-25T13:51:49.959516+00:00",
       "highest_price": 5.912,
-      "last_price": 5.878,
+      "last_price": 5.851,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 6.368320000000001,
@@ -57,7 +40,7 @@
       "volume": 7947959.37499,
       "entry_time": "2026-07-25T17:01:34.143074+00:00",
       "highest_price": 2.436e-06,
-      "last_price": 2.436e-06,
+      "last_price": 2.435e-06,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 2.7238400000000003e-06,
@@ -69,12 +52,12 @@
     }
   },
   "last_heartbeat_date": "2026-07-25",
-  "cumulative_pnl_eur": -6.2105943244100015,
+  "cumulative_pnl_eur": -6.113406658627521,
   "trading_paused": false,
-  "telegram_update_offset": 64929766,
+  "telegram_update_offset": 64929767,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
-  "last_run_time": "2026-07-25T17:02:26.737005+00:00",
+  "last_run_time": "2026-07-25T17:03:24.948350+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
