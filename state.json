@@ -1,5 +1,22 @@
 {
   "open_positions": {
+    "SHIB": {
+      "pair": "SHIBEUR",
+      "asset_code": "SHIB",
+      "entry_price": 4.375e-06,
+      "volume": 4694605.23428,
+      "entry_time": "2026-07-25T17:05:43.978367+00:00",
+      "highest_price": 4.439e-06,
+      "last_price": 4.439e-06,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 4.9e-06,
+      "sl_price": 3.8499999999999996e-06,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
     "INX": {
       "pair": "INXEUR",
       "entry_price": 0.006349,
@@ -49,23 +66,6 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
-    },
-    "SHIB": {
-      "pair": "SHIBEUR",
-      "asset_code": "SHIB",
-      "entry_price": 4.375e-06,
-      "volume": 4694605.23428,
-      "entry_time": "2026-07-25T17:05:43.978367+00:00",
-      "highest_price": 4.439e-06,
-      "last_price": 4.439e-06,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 4.9e-06,
-      "sl_price": 3.8499999999999996e-06,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-25",
@@ -74,7 +74,7 @@
   "telegram_update_offset": 64929767,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
-  "last_run_time": "2026-07-25T17:45:43.321131+00:00",
+  "last_run_time": "2026-07-25T17:46:03.386470+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
