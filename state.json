@@ -22,5 +22,7 @@
   "trading_paused": false,
   "telegram_update_offset": 64929745,
   "current_regime": "BEAR_DEFENSIVE",
-  "last_fgi": 27
+  "last_fgi": 27,
+  "last_run_time": "2026-07-25T07:39:38.017652+00:00",
+  "cooldowns": {}
 }
