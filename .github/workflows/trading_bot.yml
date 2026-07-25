@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Backup stato di partenza (per il merge a 3 vie)
+        run: cp state.json state.base.json
+
       - name: Run bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -48,20 +51,34 @@ jobs:
             exit 0
           fi
           git commit -m "Aggiorna stato posizioni [skip ci]"
+
+          # Primo tentativo: push diretto, funziona quando nessun altro
+          # run ha scritto nel frattempo (il caso comune).
+          if git push; then
+            echo "Push riuscito (diretto)"
+            exit 0
+          fi
+
+          echo "Push diretto fallito, merge a 3 vie su state.json..."
+          cp state.json state.local.json
+
           for i in 1 2 3 4 5; do
-            # Se un tentativo precedente ha lasciato un rebase a meta', annullalo
-            # prima di riprovare, altrimenti ogni retry fallisce allo stesso modo.
-            git rebase --abort >/dev/null 2>&1 || true
-            git merge --abort >/dev/null 2>&1 || true
-            if git pull --rebase origin main && git push; then
-              echo "Push riuscito"
+            git fetch origin main
+            git show origin/main:state.json > state.remote.json
+            python3 merge_state.py state.base.json state.local.json state.remote.json state.json
+
+            git reset --soft origin/main
+            git add state.json
+            git commit -m "Aggiorna stato posizioni (merge automatico) [skip ci]"
+
+            if git push; then
+              echo "Push riuscito dopo merge"
               exit 0
             fi
-            echo "Push fallito (tentativo $i), retry tra 3s..."
+            echo "Push fallito dopo merge (tentativo $i), retry tra 3s..."
             sleep 3
           done
-          git rebase --abort >/dev/null 2>&1 || true
-          echo "Push fallito dopo 5 tentativi — le modifiche di questa run non sono state salvate"
+          echo "Push fallito dopo il merge automatico — le modifiche di questa run non sono state salvate"
           exit 1
 
       - name: Alert su fallimento salvataggio stato
