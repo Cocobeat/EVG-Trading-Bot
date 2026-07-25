@@ -1,5 +1,21 @@
 {
   "open_positions": {
+    "INX": {
+      "pair": "INXEUR",
+      "entry_price": 0.006349,
+      "volume": 2756.33958,
+      "entry_time": "2026-07-24T23:46:42.540494+00:00",
+      "highest_price": 0.006364,
+      "last_price": 0.006364,
+      "tp_pct": 8.0,
+      "sl_pct": 8.0,
+      "tp_price": 0.00685692,
+      "sl_price": 0.00584108,
+      "trail_arm": 5.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 15,
+      "strategy": "pump"
+    },
     "AVAX": {
       "pair": "AVAXEUR",
       "asset_code": "AVAX",
@@ -17,22 +33,6 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "INX": {
-      "pair": "INXEUR",
-      "entry_price": 0.006349,
-      "volume": 2756.33958,
-      "entry_time": "2026-07-24T23:46:42.540494+00:00",
-      "highest_price": 0.006364,
-      "last_price": 0.006364,
-      "tp_pct": 8.0,
-      "sl_pct": 8.0,
-      "tp_price": 0.00685692,
-      "sl_price": 0.00584108,
-      "trail_arm": 5.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 15,
-      "strategy": "pump"
-    },
     "PEPE": {
       "pair": "PEPEEUR",
       "asset_code": "PEPE",
@@ -40,7 +40,7 @@
       "volume": 7947959.37499,
       "entry_time": "2026-07-25T17:01:34.143074+00:00",
       "highest_price": 2.471e-06,
-      "last_price": 2.41e-06,
+      "last_price": 2.409e-06,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 2.7238400000000003e-06,
@@ -57,7 +57,7 @@
   "telegram_update_offset": 64929777,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
-  "last_run_time": "2026-07-25T23:20:42.392090+00:00",
+  "last_run_time": "2026-07-25T23:21:30.512520+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
