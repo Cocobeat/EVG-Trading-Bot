@@ -56,7 +56,6 @@ USER_PROFILES = {
         "min_ticker_change_pct": 2.0,
         "min_hold_minutes": 20,
         "max_spread_pct": 1.5,
-        "min_volume_eur": 5000,
         "desc": "Pochi trade, protezione capitale",
     },
     "medio": {
@@ -74,7 +73,6 @@ USER_PROFILES = {
         "min_ticker_change_pct": 1.0,
         "min_hold_minutes": 15,
         "max_spread_pct": 2.0,
-        "min_volume_eur": 3000,
         "desc": "Bilanciato rischio/rendimento",
     },
     "aggressivo": {
@@ -85,14 +83,13 @@ USER_PROFILES = {
         "stop_loss_pct": 12.0,
         "trail_arm_pct": 4.0,
         "trail_distance_pct": 3.0,
-        "pump_candle_min_pct": 0.6,
-        "pump_volume_surge": 1.1,
-        "pump_rsi_max": 97,
+        "pump_candle_min_pct": 0.8,
+        "pump_volume_surge": 1.2,
+        "pump_rsi_max": 92,
         "max_total_loss_eur": 80.0,
         "min_ticker_change_pct": 0.5,
         "min_hold_minutes": 10,
-        "max_spread_pct": 5.0,
-        "min_volume_eur": 1200,
+        "max_spread_pct": 3.0,
         "desc": "Entra su tutto, massima esposizione",
     },
 }
@@ -103,6 +100,7 @@ CONFIG = {
     "QUOTE_CURRENCY": "EUR",
     "SCAN_TIMEFRAME": 5,
     "SCAN_LOOKBACK": 60,
+    "MIN_24H_VOLUME_EUR": 5000,
     "MAX_DAILY_PUMP_PCT": 50.0,
     "RSI_PERIOD": 14,
     "COOLDOWN_MINUTES": 60,
@@ -120,24 +118,6 @@ CONFIG = {
     "KRAKEN_DRY_RUN": False,
     "STATE_FILE": "state.json",
     "TICKER_BATCH_SIZE": 80,
-
-    # Conferma di trend a 1h: filtra i pump che avvengono dentro un trend
-    # orario ancora chiaramente ribassista (rimbalzi morti). Se la coin ha
-    # meno storia oraria di TREND_CONFIRM_MIN_CANDLES (listing recente), il
-    # filtro non si applica: non vogliamo perdere i listing nuovi, spesso i
-    # pump migliori per questo bot.
-    "TREND_CONFIRM_INTERVAL": 60,
-    "TREND_CONFIRM_SMA_PERIOD": 10,
-    "TREND_CONFIRM_MIN_CANDLES": 12,
-
-    # Correlazione tra posizioni aperte: Kraken non espone una "categoria"
-    # via API pubblica (quella dello screenshot e' solo nel sito), quindi
-    # usiamo una proxy piu' solida e senza dipendenze esterne: la
-    # correlazione dei rendimenti a 5min tra il candidato e ogni posizione
-    # gia' aperta. Se si muovono troppo insieme, e' rischio concentrato
-    # anche se sono coin "diverse".
-    "MAX_POSITION_CORRELATION": 0.75,
-    "CORRELATION_LOOKBACK": 30,
 }
 
 RISK_PROFILES = {
@@ -191,7 +171,6 @@ def get_params(regime, state):
         "min_ticker_chg": up["min_ticker_change_pct"],
         "min_hold_min": up.get("min_hold_minutes", 15),
         "max_spread": up.get("max_spread_pct", 2.0),
-        "min_vol_eur": up.get("min_volume_eur", 5000),
     }
 
 
@@ -714,49 +693,6 @@ def compute_rsi(closes, period=14):
     return rsis
 
 
-def check_trend_1h(pair):
-    """
-    Conferma di trend a 1h: il prezzo deve stare sopra la sua media mobile
-    delle ultime N ore. Se manca storia sufficiente (coin appena listata)
-    il filtro non blocca (ritorna True) — meglio un falso negativo raro
-    che perdere sistematicamente i listing nuovi.
-    """
-    try:
-        ohlc = get_ohlc(pair, CONFIG["TREND_CONFIRM_INTERVAL"],
-                         CONFIG["TREND_CONFIRM_SMA_PERIOD"] + 5)
-    except RateLimitError:
-        raise
-    except Exception as e:
-        print(f"[WARN] trend 1h {pair}: {e}")
-        return True
-
-    closes = ohlc["closes"]
-    period = CONFIG["TREND_CONFIRM_SMA_PERIOD"]
-    if len(closes) < CONFIG["TREND_CONFIRM_MIN_CANDLES"]:
-        return True
-    sma = sum(closes[-period:]) / period
-    return closes[-1] > sma
-
-
-def pct_returns(closes):
-    return [(closes[i] - closes[i - 1]) / closes[i - 1]
-            for i in range(1, len(closes)) if closes[i - 1] > 0]
-
-
-def correlation(a, b):
-    n = min(len(a), len(b))
-    if n < 5:
-        return 0.0
-    a, b = a[-n:], b[-n:]
-    mean_a, mean_b = sum(a) / n, sum(b) / n
-    cov = sum((a[i] - mean_a) * (b[i] - mean_b) for i in range(n))
-    var_a = sum((x - mean_a) ** 2 for x in a)
-    var_b = sum((x - mean_b) ** 2 for x in b)
-    if var_a <= 0 or var_b <= 0:
-        return 0.0
-    return cov / math.sqrt(var_a * var_b)
-
-
 # ================== SCAN ==================
 
 def scan_pumping(all_pairs, tickers, params, state):
@@ -780,7 +716,7 @@ def scan_pumping(all_pairs, tickers, params, state):
 
         # Volume 24h in EUR
         vol_eur = float(tick["v"][1]) * last_price
-        if vol_eur < params["min_vol_eur"]:
+        if vol_eur < CONFIG["MIN_24H_VOLUME_EUR"]:
             skipped_vol += 1
             continue
 
@@ -922,22 +858,6 @@ def check_buys(positions, pumping, state, params, balances):
     if trading_enabled() and available_eur is not None:
         print(f"Balance EUR disponibile: {available_eur:.2f}€")
 
-    # Rendimenti recenti delle posizioni gia' aperte, per il filtro di
-    # correlazione (vedi CONFIG["MAX_POSITION_CORRELATION"]). Calcolati una
-    # sola volta per run, non per candidato.
-    open_returns = {}
-    if positions:
-        try:
-            for pbase, pos in positions.items():
-                pohlc = get_ohlc(pos["pair"], CONFIG["SCAN_TIMEFRAME"],
-                                  CONFIG["CORRELATION_LOOKBACK"])
-                open_returns[pbase] = pct_returns(pohlc["closes"])
-        except RateLimitError as e:
-            print(f"[RATE LIMIT] {e} — salto acquisti per questo run")
-            return 0
-        except Exception as e:
-            print(f"[WARN] OHLC posizioni aperte (correlazione): {e}")
-
     for c in pumping:
         if bought >= max_buys:
             break
@@ -953,19 +873,6 @@ def check_buys(positions, pumping, state, params, balances):
         base = c["base"]
         if base in positions:
             continue
-
-        # Guardia sul saldo reale: se possediamo gia' un importo non
-        # trascurabile di questo asset su Kraken, non ricompriamo, anche se
-        # lo stato locale non lo traccia (es. un push su git fallito ha
-        # perso la posizione dal state.json). Il saldo Kraken e' la fonte
-        # di verita' definitiva, non lo e' positions.
-        asset_code = c.get("asset_code")
-        if trading_enabled() and asset_code and asset_code in balances:
-            real_bal = balances[asset_code]
-            if real_bal * c["last_price"] >= CONFIG["MIN_TRADE_EUR"]:
-                print(f"  Skip {base}: saldo reale gia' presente "
-                      f"({real_bal:.6f}, non tracciato in state.json)")
-                continue
 
         try:
             ohlc_checks += 1
@@ -995,22 +902,6 @@ def check_buys(positions, pumping, state, params, balances):
             time.sleep(0.3)
             continue
 
-        # Correlazione con posizioni gia' aperte: evita di concentrare il
-        # rischio su coin che si muovono insieme (proxy di diversificazione
-        # settoriale, dato che Kraken non espone una categoria via API).
-        if open_returns:
-            cand_returns = pct_returns(closes)
-            skip_corr = False
-            for pbase, pret in open_returns.items():
-                r = correlation(cand_returns, pret)
-                if r >= CONFIG["MAX_POSITION_CORRELATION"]:
-                    print(f"  Skip {base}: correlato con {pbase} (r={r:.2f})")
-                    skip_corr = True
-                    break
-            if skip_corr:
-                time.sleep(0.3)
-                continue
-
         # Volume surge
         avg_n = min(20, len(volumes) - 3)
         if avg_n < 3:
@@ -1030,18 +921,6 @@ def check_buys(positions, pumping, state, params, balances):
         if rsi > params["pump_rsi_max"]:
             time.sleep(0.3)
             continue
-
-        # Conferma di trend a 1h: scarta i pump dentro un trend orario
-        # ancora ribassista (rimbalzi morti). Ultimo filtro prima di
-        # comprare, cosi' la chiamata OHLC extra si paga solo per i
-        # candidati che hanno gia' passato tutto il resto.
-        try:
-            if not check_trend_1h(c["pair"]):
-                time.sleep(0.3)
-                continue
-        except RateLimitError as e:
-            print(f"[RATE LIMIT] {e} — interrompo la scansione acquisti per questo run")
-            break
 
         # Dimensiona l'ordine, capato al capitale reale disponibile
         price = c["last_price"]
@@ -1168,7 +1047,7 @@ def _run_body(state):
     pumping = scan_pumping(all_pairs, tickers, params, state)
     print(f"{len(pumping)} pump qualificati "
           f"({params['min_ticker_chg']}%-{CONFIG['MAX_DAILY_PUMP_PCT']}%, "
-          f"vol>{params['min_vol_eur']}€, spread<{params['max_spread']}%)")
+          f"vol>{CONFIG['MIN_24H_VOLUME_EUR']}€, spread<{params['max_spread']}%)")
     if pumping:
         top = ", ".join(
             f"{p['base']}(+{p['change_today_pct']:.0f}%,{p['vol_eur']:.0f}€,"
@@ -1209,7 +1088,7 @@ def _run_body(state):
             f"TP +{params['tp_pct']:.0f}% SL -{params['sl_pct']:.0f}%\n"
             f"Trail: {params['trail_arm']}%/{params['trail_dist']}% | "
             f"Hold: {params['min_hold_min']}min | Spread <{params['max_spread']}%\n"
-            f"Vol min: {params['min_vol_eur']}€ | "
+            f"Vol min: {CONFIG['MIN_24H_VOLUME_EUR']}€ | "
             f"Anti-FOMO: <{CONFIG['MAX_DAILY_PUMP_PCT']:.0f}% | "
             f"Max buy/run: {CONFIG['MAX_BUYS_PER_RUN']}\n"
             f"Pump: {len(pumping)} | Pos: {len(positions)} | "

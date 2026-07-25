@@ -1,13 +1,30 @@
 {
   "open_positions": {
+    "GFI": {
+      "pair": "GFIEUR",
+      "asset_code": "GFI",
+      "entry_price": 0.0343,
+      "volume": 610.40816,
+      "entry_time": "2026-07-25T13:35:44.333276+00:00",
+      "highest_price": 0.0343,
+      "last_price": 0.0343,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.038416,
+      "sl_price": 0.030184,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
     "TEL": {
       "pair": "TELEUR",
       "asset_code": "TEL",
       "entry_price": 0.001508,
       "volume": 13883.95225464,
       "entry_time": "2026-07-25T13:31:15.115651+00:00",
-      "highest_price": 0.001515,
-      "last_price": 0.001511,
+      "highest_price": 0.001523,
+      "last_price": 0.001523,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 0.0016889600000000002,
@@ -32,23 +49,6 @@
       "trail_dist": 3.0,
       "min_hold_min": 15,
       "strategy": "pump"
-    },
-    "GFI": {
-      "pair": "GFIEUR",
-      "asset_code": "GFI",
-      "entry_price": 0.0343,
-      "volume": 610.40816,
-      "entry_time": "2026-07-25T13:35:44.333276+00:00",
-      "highest_price": 0.0343,
-      "last_price": 0.0343,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.038416,
-      "sl_price": 0.030184,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-25",
@@ -57,7 +57,7 @@
   "telegram_update_offset": 64929759,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
-  "last_run_time": "2026-07-25T13:49:23.341393+00:00",
+  "last_run_time": "2026-07-25T13:50:42.574429+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
