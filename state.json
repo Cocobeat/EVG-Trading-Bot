@@ -16,23 +16,6 @@
       "min_hold_min": 15,
       "strategy": "pump"
     },
-    "AVAX": {
-      "pair": "AVAXEUR",
-      "asset_code": "AVAX",
-      "entry_price": 5.686,
-      "volume": 2.7157817,
-      "entry_time": "2026-07-25T13:51:49.959516+00:00",
-      "highest_price": 5.912,
-      "last_price": 5.868,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 6.368320000000001,
-      "sl_price": 5.00368,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "TEL": {
       "pair": "TELEUR",
       "asset_code": "TEL",
@@ -45,6 +28,23 @@
       "sl_pct": 12.0,
       "tp_price": 0.0016889600000000002,
       "sl_price": 0.00132704,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
+    "AVAX": {
+      "pair": "AVAXEUR",
+      "asset_code": "AVAX",
+      "entry_price": 5.686,
+      "volume": 2.7157817,
+      "entry_time": "2026-07-25T13:51:49.959516+00:00",
+      "highest_price": 5.912,
+      "last_price": 5.869,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 6.368320000000001,
+      "sl_price": 5.00368,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "min_hold_min": 10,
@@ -74,7 +74,7 @@
   "telegram_update_offset": 64929766,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
-  "last_run_time": "2026-07-25T17:01:00.834639+00:00",
+  "last_run_time": "2026-07-25T17:01:48.394315+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
