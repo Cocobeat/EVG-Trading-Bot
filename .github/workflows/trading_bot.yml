@@ -5,8 +5,8 @@ name: Trading Signal Bot
 
 on:
   schedule:
-    - cron: '* * * * *'
-  workflow_dispatch: {}
+    - cron: '*/10 * * * *'   # fallback interno, di riserva se cron-job.org non parte
+  workflow_dispatch: {}       # trigger primario, chiamato ogni minuto da cron-job.org
 
 concurrency:
   group: trading-bot
