@@ -1,7 +1,19 @@
 """
-Bot di trading v5.0 — Pump Catcher Pro
+Bot di trading v5.1 — Pump Catcher Pro
 
-Logica:
+Novita' rispetto a v5.0 (fix strutturali da audit):
+  - Save garantito: try/except/finally attorno a run(), lo stato si salva
+    sempre anche se qualcosa esplode a meta'. Alert Telegram su crash.
+  - Balance reale: prima di comprare controlla l'EUR disponibile su Kraken
+    (non solo la matematica dei profili) ed evita di sforare il capitale.
+  - Vendita sicura: prima di vendere controlla il saldo reale dell'asset,
+    evita errori "insufficient funds" dovuti a fee/dust.
+  - Prezzo di carico reale: dopo un acquisto live, interroga Kraken per il
+    prezzo di riempimento effettivo invece di fidarsi del Ticker stantio.
+  - Rate limit: se Kraken risponde 429, il bot si ferma per quel run invece
+    di insistere; tetto massimo di controlli OHLC per run.
+
+Logica di base (invariata):
   1. Scansiona TUTTE le coppie EUR su Kraken via Ticker batch
   2. Filtra pump per variazione giornaliera, volume, spread
   3. Deep-dive OHLC: candela pump + volume surge + RSI
@@ -11,14 +23,6 @@ Logica:
   7. Max 1 acquisto per run (riduce correlazione)
   8. Regime detection (F&G + BTC) scala i parametri
   9. 3 profili rischio switchabili da Telegram
-
-Protezioni:
-  - Anti-FOMO: ignora coin gia' oltre +50% giornaliero
-  - Spread check: ignora coin con spread > 2%
-  - Volume minimo: 5000 EUR/24h (liquidita' reale)
-  - SL floor: il regime non stringe mai lo SL sotto il base
-  - Kill-switch: pausa automatica oltre la soglia di perdita
-  - Save atomico: protegge state.json da corruzione
 """
 
 import base64
@@ -28,6 +32,7 @@ import json
 import math
 import os
 import time
+import traceback
 import urllib.parse
 from datetime import datetime, timezone
 
@@ -100,6 +105,9 @@ CONFIG = {
     "RSI_PERIOD": 14,
     "COOLDOWN_MINUTES": 60,
     "MAX_BUYS_PER_RUN": 1,
+    "MAX_OHLC_CHECKS_PER_RUN": 20,
+    "MIN_TRADE_EUR": 5.0,
+    "BUY_SAFETY_MARGIN": 0.997,
 
     "FGI_BULL_THRESHOLD": 55,
     "FGI_BEAR_THRESHOLD": 35,
@@ -131,6 +139,11 @@ REGIME_LABEL = {
 KRAKEN_PUBLIC = "https://api.kraken.com/0/public"
 KRAKEN_PRIVATE = "https://api.kraken.com"
 FGI_API = "https://api.alternative.me/fng/"
+
+
+class RateLimitError(Exception):
+    """Sollevato quando Kraken risponde 429 (rate limit)."""
+    pass
 
 
 # ================== PARAMETRI EFFETTIVI ==================
@@ -398,22 +411,37 @@ def force_close_all(state):
         telegram_send("\U0001F6D1 Pausa. Nessuna posizione da chiudere.", all_buttons(state))
         return
     telegram_send(f"\U0001F6D1 Chiusura {len(positions)} posizioni...")
+    balances = get_balances()
     for base in list(positions.keys()):
-        force_close_one(state, base)
+        force_close_one(state, base, balances)
     telegram_send("✅ Tutto chiuso. /riprendi per riattivare.", all_buttons(state))
 
 
-def force_close_one(state, base):
+def force_close_one(state, base, balances=None):
     positions = state.get("open_positions", {})
     pos = positions.get(base)
     if not pos:
         telegram_send(f"Nessuna posizione per {base}.")
         return
+    if balances is None:
+        balances = get_balances()
     price = pos.get("last_price", pos["entry_price"])
+    sell_vol = pos["volume"]
     order_note = ""
     if trading_enabled():
+        asset_code = pos.get("asset_code")
+        if asset_code and asset_code in balances:
+            real_bal = balances[asset_code]
+            if real_bal <= 0:
+                telegram_send(
+                    f"⚠️ {base}: saldo reale 0, rimuovo la posizione senza ordine "
+                    f"(probabilmente gia' venduta manualmente).",
+                )
+                del positions[base]
+                return
+            sell_vol = min(sell_vol, real_bal)
         try:
-            result = place_order(pos["pair"], "sell", pos["volume"])
+            result = place_order(pos["pair"], "sell", sell_vol)
             txid = result.get("txid", ["(ok)"])[0]
             order_note = f"\nOrdine: {txid} ({mode_label()})"
         except Exception as e:
@@ -421,7 +449,7 @@ def force_close_one(state, base):
             return
     entry = pos["entry_price"]
     chg = (price - entry) / entry * 100
-    pnl = (price - entry) * pos["volume"]
+    pnl = (price - entry) * sell_vol
     state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl
     telegram_send(
         f"\U0001F534 VENDUTO {base}\n{fp(entry)} → {fp(price)} ({chg:+.1f}%)\n"
@@ -436,14 +464,20 @@ def force_close_one(state, base):
 def load_state():
     if os.path.exists(CONFIG["STATE_FILE"]):
         with open(CONFIG["STATE_FILE"], "r") as f:
-            return json.load(f)
-    return {
-        "open_positions": {}, "last_heartbeat_date": None,
-        "cumulative_pnl_eur": 0.0, "trading_paused": False,
-        "telegram_update_offset": 0, "current_regime": "NEUTRAL",
-        "last_fgi": None, "user_profile": "medio",
-        "cooldowns": {}, "last_run_time": None,
-    }
+            state = json.load(f)
+    else:
+        state = {}
+    state.setdefault("open_positions", {})
+    state.setdefault("last_heartbeat_date", None)
+    state.setdefault("cumulative_pnl_eur", 0.0)
+    state.setdefault("trading_paused", False)
+    state.setdefault("telegram_update_offset", 0)
+    state.setdefault("current_regime", "NEUTRAL")
+    state.setdefault("last_fgi", None)
+    state.setdefault("user_profile", "medio")
+    state.setdefault("cooldowns", {})
+    state.setdefault("last_run_time", None)
+    return state
 
 
 def save_state(state):
@@ -504,6 +538,8 @@ def get_ohlc(pair, interval=None, lookback=None):
         lookback = CONFIG["SCAN_LOOKBACK"]
     r = requests.get(f"{KRAKEN_PUBLIC}/OHLC",
                      params={"pair": pair, "interval": interval}, timeout=20)
+    if r.status_code == 429:
+        raise RateLimitError(f"OHLC {pair}: HTTP 429")
     r.raise_for_status()
     data = r.json()
     if data.get("error"):
@@ -531,6 +567,7 @@ def get_all_eur_pairs():
         if ws.endswith(f"/{CONFIG['QUOTE_CURRENCY']}"):
             pairs[name] = {
                 "base": ws.split("/")[0],
+                "asset_code": info.get("base"),
                 "ordermin": float(info.get("ordermin", 0) or 0),
                 "lot_decimals": int(info.get("lot_decimals", 8)),
             }
@@ -546,6 +583,9 @@ def get_ticker_batch(pair_names):
         try:
             r = requests.get(f"{KRAKEN_PUBLIC}/Ticker",
                              params={"pair": ",".join(chunk)}, timeout=20)
+            if r.status_code == 429:
+                print(f"[RATE LIMIT] Kraken 429 su Ticker batch {i}, fermo la scansione")
+                break
             r.raise_for_status()
             data = r.json()
             if data.get("result"):
@@ -577,6 +617,8 @@ def kraken_private(path, data):
     payload["nonce"] = str(int(time.time() * 1000))
     headers = {"API-Key": key, "API-Sign": _kraken_sig(path, payload, secret)}
     r = requests.post(KRAKEN_PRIVATE + path, headers=headers, data=payload, timeout=20)
+    if r.status_code == 429:
+        raise RateLimitError(f"{path}: HTTP 429")
     r.raise_for_status()
     res = r.json()
     if res.get("error"):
@@ -589,6 +631,40 @@ def place_order(pair, side, volume):
     if CONFIG["KRAKEN_DRY_RUN"]:
         data["validate"] = "true"
     return kraken_private("/0/private/AddOrder", data)
+
+
+def get_balances():
+    """Ritorna un dict {asset_code: saldo_float}. Vuoto se non in modalita' live/trading."""
+    if not trading_enabled():
+        return {}
+    try:
+        res = kraken_private("/0/private/Balance", {})
+        return {k: float(v) for k, v in res.items()}
+    except Exception as e:
+        print(f"[WARN] Balance: {e}")
+        return {}
+
+
+def get_eur_balance(balances):
+    for key in ("ZEUR", "EUR"):
+        if key in balances:
+            return balances[key]
+    return None
+
+
+def get_order_fill(txid):
+    """Interroga Kraken per prezzo medio e volume eseguito di un ordine chiuso."""
+    try:
+        res = kraken_private("/0/private/QueryOrders", {"txid": txid})
+        info = res.get(txid)
+        if info:
+            price = float(info.get("price", 0) or 0)
+            vol_exec = float(info.get("vol_exec", 0) or 0)
+            if price > 0 and vol_exec > 0:
+                return price, vol_exec
+    except Exception as e:
+        print(f"[WARN] QueryOrders {txid}: {e}")
+    return None, None
 
 
 def mode_label():
@@ -667,7 +743,7 @@ def scan_pumping(all_pairs, tickers, params, state):
             continue
 
         pumping.append({
-            "pair": pair_name, "base": base,
+            "pair": pair_name, "base": base, "asset_code": info.get("asset_code"),
             "ordermin": info["ordermin"], "lot_decimals": info["lot_decimals"],
             "last_price": last_price, "change_today_pct": chg,
             "vol_eur": vol_eur, "spread_pct": spread,
@@ -682,7 +758,7 @@ def scan_pumping(all_pairs, tickers, params, state):
 
 # ================== SELL ==================
 
-def check_sells(positions, tickers, state, params):
+def check_sells(positions, tickers, state, params, balances):
     for base, pos in list(positions.items()):
         tick = tickers.get(pos["pair"])
         if not tick:
@@ -722,17 +798,29 @@ def check_sells(positions, tickers, state, params):
         if not reason:
             continue
 
+        sell_vol = pos["volume"]
         order_note = ""
         if trading_enabled():
+            asset_code = pos.get("asset_code")
+            if asset_code and asset_code in balances:
+                real_bal = balances[asset_code]
+                if real_bal <= 0:
+                    telegram_send(
+                        f"⚠️ {base}: saldo reale 0, rimuovo la posizione senza ordine "
+                        f"(probabile vendita manuale o dust)."
+                    )
+                    del positions[base]
+                    continue
+                sell_vol = min(sell_vol, real_bal)
             try:
-                result = place_order(pos["pair"], "sell", pos["volume"])
+                result = place_order(pos["pair"], "sell", sell_vol)
                 txid = result.get("txid", ["(ok)"])[0]
                 order_note = f"\nOrdine: {txid}"
             except Exception as e:
                 telegram_send(f"⚠️ Errore vendita {base}: {e}")
                 continue
 
-        pnl = (price - entry) * pos["volume"]
+        pnl = (price - entry) * sell_vol
         state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl
 
         telegram_send(
@@ -760,21 +848,38 @@ def check_sells(positions, tickers, state, params):
 
 # ================== BUY ==================
 
-def check_buys(positions, pumping, state, params):
+def check_buys(positions, pumping, state, params, balances):
     bought = 0
     max_buys = CONFIG["MAX_BUYS_PER_RUN"]
+    ohlc_checks = 0
+    max_ohlc = CONFIG["MAX_OHLC_CHECKS_PER_RUN"]
+
+    available_eur = get_eur_balance(balances) if trading_enabled() else None
+    if trading_enabled() and available_eur is not None:
+        print(f"Balance EUR disponibile: {available_eur:.2f}€")
 
     for c in pumping:
         if bought >= max_buys:
             break
         if len(positions) >= params["max_pos"]:
             break
+        if ohlc_checks >= max_ohlc:
+            print(f"  Raggiunto tetto {max_ohlc} controlli OHLC per questo run")
+            break
+        if trading_enabled() and available_eur is not None and available_eur < CONFIG["MIN_TRADE_EUR"]:
+            print(f"  Capitale EUR insufficiente ({available_eur:.2f}€), stop acquisti")
+            break
+
         base = c["base"]
         if base in positions:
             continue
 
         try:
+            ohlc_checks += 1
             ohlc = get_ohlc(c["pair"])
+        except RateLimitError as e:
+            print(f"[RATE LIMIT] {e} — interrompo la scansione acquisti per questo run")
+            break
         except Exception as e:
             print(f"[ERR] OHLC {c['pair']}: {e}")
             continue
@@ -817,10 +922,19 @@ def check_buys(positions, pumping, state, params):
             time.sleep(0.3)
             continue
 
-        # Ordine
+        # Dimensiona l'ordine, capato al capitale reale disponibile
         price = c["last_price"]
         eur = params["eur"]
-        vol = round_vol(eur / price, c["lot_decimals"])
+        reduced_for_capital = False
+        if trading_enabled() and available_eur is not None:
+            capped = max(0.0, available_eur - 1.0)  # margine di sicurezza per fee
+            if capped < eur:
+                eur = capped
+                reduced_for_capital = True
+            if eur < CONFIG["MIN_TRADE_EUR"]:
+                continue
+
+        vol = round_vol((eur * CONFIG["BUY_SAFETY_MARGIN"]) / price, c["lot_decimals"])
         if vol <= 0 or vol < c["ordermin"]:
             continue
 
@@ -835,6 +949,15 @@ def check_buys(positions, pumping, state, params):
                 time.sleep(0.3)
                 continue
 
+            # Prezzo/volume di riempimento reale (solo LIVE, non dry-run)
+            if not CONFIG["KRAKEN_DRY_RUN"]:
+                time.sleep(1.5)
+                fill_price, fill_vol = get_order_fill(txid)
+                if fill_price and fill_vol:
+                    price = fill_price
+                    vol = fill_vol
+                available_eur = max(0.0, available_eur - eur) if available_eur is not None else None
+
         regime = state.get("current_regime", "NEUTRAL")
         up, _ = get_user_profile(state)
         tp = params["tp_pct"]
@@ -843,10 +966,12 @@ def check_buys(positions, pumping, state, params):
         sl_price = price * (1 - sl / 100)
         tp_price = price * (1 + tp / 100)
 
+        cap_note = " (ridotto per capitale disponibile)" if reduced_for_capital else ""
+
         telegram_send(
             f"\U0001F680 <b>COMPRA {base}/{CONFIG['QUOTE_CURRENCY']}</b>\n"
             f"{REGIME_LABEL.get(regime, '')} | {up['label']}\n"
-            f"Prezzo: {fp(price)} | {eur:.0f}€\n"
+            f"Prezzo: {fp(price)} | {eur:.0f}€{cap_note}\n"
             f"Pump: +{c['change_today_pct']:.1f}% | Candela: +{candle_chg:.1f}% | "
             f"Spread: {c['spread_pct']:.1f}%\n"
             f"Vol 24h: {c['vol_eur']:.0f}€ | Surge: {vol_ratio:.1f}x | RSI: {rsi:.0f}\n"
@@ -859,7 +984,8 @@ def check_buys(positions, pumping, state, params):
         )
 
         positions[base] = {
-            "pair": c["pair"], "entry_price": price, "volume": vol,
+            "pair": c["pair"], "asset_code": c.get("asset_code"),
+            "entry_price": price, "volume": vol,
             "entry_time": datetime.now(timezone.utc).isoformat(),
             "highest_price": price, "last_price": price,
             "tp_pct": tp, "sl_pct": sl,
@@ -875,9 +1001,8 @@ def check_buys(positions, pumping, state, params):
 
 # ================== MAIN ==================
 
-def run():
-    state = load_state()
-    positions = state.get("open_positions", {})
+def _run_body(state):
+    positions = state["open_positions"]
 
     # Calcola tempo trascorso per cooldown
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -907,6 +1032,12 @@ def run():
           f"hold {params['min_hold_min']}min, spread <{params['max_spread']}%")
     print(f"Mode: {mode_label()}")
 
+    balances = get_balances()
+    if balances:
+        eur_bal = get_eur_balance(balances)
+        if eur_bal is not None:
+            print(f"Balance EUR: {eur_bal:.2f}€")
+
     all_pairs = get_all_eur_pairs()
     print(f"{len(all_pairs)} coppie EUR")
 
@@ -925,12 +1056,12 @@ def run():
         )
         print(f"  Top: {top}")
 
-    check_sells(positions, tickers, state, params)
+    check_sells(positions, tickers, state, params, balances)
 
     if state.get("trading_paused"):
         print("In pausa.")
     elif len(positions) < params["max_pos"]:
-        n = check_buys(positions, pumping, state, params)
+        n = check_buys(positions, pumping, state, params, balances)
         print(f"Aperte {n} posizioni" if n else "Nessun entry")
 
     # Heartbeat giornaliero
@@ -950,7 +1081,7 @@ def run():
             cd_info = f"\nCooldown: {len(cooldowns)} coin"
 
         telegram_send(
-            f"✅ <b>Bot v5.0 ({mode_label()})</b>\n"
+            f"✅ <b>Bot v5.1 ({mode_label()})</b>\n"
             f"{REGIME_LABEL.get(regime, regime)} | {up['label']}\n"
             f"F&G: {fgi if fgi is not None else '?'} | BTC: {btc_arr}\n"
             f"{params['eur']:.0f}€/trade | max {params['max_pos']} pos | "
@@ -967,9 +1098,24 @@ def run():
         )
         state["last_heartbeat_date"] = today
 
-    state["open_positions"] = positions
-    save_state(state)
-    print("Done.")
+
+def run():
+    state = load_state()
+    try:
+        _run_body(state)
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(tb)
+        telegram_send(
+            f"⚠️ <b>Errore nel bot</b>: {e}\n"
+            f"Lo stato viene comunque salvato. Controlla i log GitHub Actions."
+        )
+        save_state(state)
+        print("Done (con errore).")
+        raise
+    else:
+        save_state(state)
+        print("Done.")
 
 
 if __name__ == "__main__":
