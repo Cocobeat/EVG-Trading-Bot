@@ -16,23 +16,6 @@
       "min_hold_min": 15,
       "strategy": "pump"
     },
-    "PEPE": {
-      "pair": "PEPEEUR",
-      "asset_code": "PEPE",
-      "entry_price": 2.432e-06,
-      "volume": 7947959.37499,
-      "entry_time": "2026-07-25T17:01:34.143074+00:00",
-      "highest_price": 2.471e-06,
-      "last_price": 2.418e-06,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 2.7238400000000003e-06,
-      "sl_price": 2.14016e-06,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "AVAX": {
       "pair": "AVAXEUR",
       "asset_code": "AVAX",
@@ -49,6 +32,23 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "PEPE": {
+      "pair": "PEPEEUR",
+      "asset_code": "PEPE",
+      "entry_price": 2.432e-06,
+      "volume": 7947959.37499,
+      "entry_time": "2026-07-25T17:01:34.143074+00:00",
+      "highest_price": 2.471e-06,
+      "last_price": 2.418e-06,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 2.7238400000000003e-06,
+      "sl_price": 2.14016e-06,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-25",
@@ -57,7 +57,7 @@
   "telegram_update_offset": 64929777,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
-  "last_run_time": "2026-07-25T23:01:02.334078+00:00",
+  "last_run_time": "2026-07-25T23:01:44.610579+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
