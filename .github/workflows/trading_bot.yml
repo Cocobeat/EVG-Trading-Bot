@@ -5,7 +5,7 @@ name: Trading Signal Bot
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # fallback interno, di riserva se cron-job.org non parte
+    - cron: '*/30 * * * *'   # fallback interno, di riserva se cron-job.org non parte
   workflow_dispatch: {}       # trigger primario, chiamato ogni minuto da cron-job.org
 
 concurrency:
@@ -49,6 +49,10 @@ jobs:
           fi
           git commit -m "Aggiorna stato posizioni [skip ci]"
           for i in 1 2 3 4 5; do
+            # Se un tentativo precedente ha lasciato un rebase a meta', annullalo
+            # prima di riprovare, altrimenti ogni retry fallisce allo stesso modo.
+            git rebase --abort >/dev/null 2>&1 || true
+            git merge --abort >/dev/null 2>&1 || true
             if git pull --rebase origin main && git push; then
               echo "Push riuscito"
               exit 0
@@ -56,7 +60,8 @@ jobs:
             echo "Push fallito (tentativo $i), retry tra 3s..."
             sleep 3
           done
-          echo "Push fallito dopo 5 tentativi"
+          git rebase --abort >/dev/null 2>&1 || true
+          echo "Push fallito dopo 5 tentativi — le modifiche di questa run non sono state salvate"
           exit 1
 
       - name: Alert su fallimento salvataggio stato
