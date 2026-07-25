@@ -5,8 +5,12 @@ name: Trading Signal Bot
 
 on:
   schedule:
-    - cron: '*/5 * * * *'   # ogni 5 minuti. Modifica qui per cambiare frequenza (es. '*/15 * * * *')
-  workflow_dispatch: {}       # permette di avviarlo manualmente dal tab "Actions" per testare
+    - cron: '* * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: trading-bot
+  cancel-in-progress: false
 
 permissions:
   contents: write   # necessario per salvare lo stato (state.json) nel repo
