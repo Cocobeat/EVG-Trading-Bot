@@ -1,20 +1,19 @@
 {
   "open_positions": {
-    "AVAX": {
-      "pair": "AVAXEUR",
-      "asset_code": "AVAX",
-      "entry_price": 5.686,
-      "volume": 2.7157817,
-      "entry_time": "2026-07-25T13:51:49.959516+00:00",
-      "highest_price": 6.004,
-      "last_price": 5.984,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 6.368320000000001,
-      "sl_price": 5.00368,
-      "trail_arm": 4.0,
+    "INX": {
+      "pair": "INXEUR",
+      "entry_price": 0.006349,
+      "volume": 2756.33958,
+      "entry_time": "2026-07-24T23:46:42.540494+00:00",
+      "highest_price": 0.006364,
+      "last_price": 0.006364,
+      "tp_pct": 8.0,
+      "sl_pct": 8.0,
+      "tp_price": 0.00685692,
+      "sl_price": 0.00584108,
+      "trail_arm": 5.0,
       "trail_dist": 3.0,
-      "min_hold_min": 10,
+      "min_hold_min": 15,
       "strategy": "pump"
     },
     "PEPE": {
@@ -34,20 +33,21 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "INX": {
-      "pair": "INXEUR",
-      "entry_price": 0.006349,
-      "volume": 2756.33958,
-      "entry_time": "2026-07-24T23:46:42.540494+00:00",
-      "highest_price": 0.006364,
-      "last_price": 0.006364,
-      "tp_pct": 8.0,
-      "sl_pct": 8.0,
-      "tp_price": 0.00685692,
-      "sl_price": 0.00584108,
-      "trail_arm": 5.0,
+    "AVAX": {
+      "pair": "AVAXEUR",
+      "asset_code": "AVAX",
+      "entry_price": 5.686,
+      "volume": 2.7157817,
+      "entry_time": "2026-07-25T13:51:49.959516+00:00",
+      "highest_price": 6.004,
+      "last_price": 5.987,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 6.368320000000001,
+      "sl_price": 5.00368,
+      "trail_arm": 4.0,
       "trail_dist": 3.0,
-      "min_hold_min": 15,
+      "min_hold_min": 10,
       "strategy": "pump"
     }
   },
@@ -57,7 +57,7 @@
   "telegram_update_offset": 64929777,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
-  "last_run_time": "2026-07-25T22:50:43.453760+00:00",
+  "last_run_time": "2026-07-25T22:51:32.029418+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
