@@ -1,12 +1,30 @@
 {
-  "open_positions": {},
+  "open_positions": {
+    "CFG": {
+      "pair": "CFGEUR",
+      "asset_code": "CFG",
+      "entry_price": 0.1536,
+      "volume": 136.30859375,
+      "entry_time": "2026-07-26T14:36:04.876003+00:00",
+      "highest_price": 0.1536,
+      "last_price": 0.1536,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.172032,
+      "sl_price": 0.13516799999999998,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    }
+  },
   "last_heartbeat_date": "2026-07-26",
   "cumulative_pnl_eur": -5.972055400361322,
   "trading_paused": false,
   "telegram_update_offset": 64929787,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T14:34:24.236563+00:00",
+  "last_run_time": "2026-07-26T14:35:34.902189+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
