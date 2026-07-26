@@ -1,5 +1,22 @@
 {
   "open_positions": {
+    "ZBT": {
+      "pair": "ZBTEUR",
+      "asset_code": "ZBT",
+      "entry_price": 0.10037,
+      "volume": 201.8843,
+      "entry_time": "2026-07-26T09:05:50.681687+00:00",
+      "highest_price": 0.10174,
+      "last_price": 0.10174,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.11241440000000001,
+      "sl_price": 0.0883256,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
     "INX": {
       "pair": "INXEUR",
       "entry_price": 0.006349,
@@ -23,28 +40,11 @@
       "volume": 2.7157817,
       "entry_time": "2026-07-25T13:51:49.959516+00:00",
       "highest_price": 6.004,
-      "last_price": 5.921,
+      "last_price": 5.909,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 6.368320000000001,
       "sl_price": 5.00368,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
-    "ZBT": {
-      "pair": "ZBTEUR",
-      "asset_code": "ZBT",
-      "entry_price": 0.10037,
-      "volume": 201.8843,
-      "entry_time": "2026-07-26T09:05:50.681687+00:00",
-      "highest_price": 0.10174,
-      "last_price": 0.10174,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.11241440000000001,
-      "sl_price": 0.0883256,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "min_hold_min": 10,
@@ -57,7 +57,7 @@
   "telegram_update_offset": 64929781,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T10:01:04.143273+00:00",
+  "last_run_time": "2026-07-26T10:01:55.621267+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
