@@ -1,22 +1,5 @@
 {
   "open_positions": {
-    "SAFE": {
-      "pair": "SAFEEUR",
-      "asset_code": "SAFE",
-      "entry_price": 0.078,
-      "volume": 268.42307,
-      "entry_time": "2026-07-26T15:44:33.208294+00:00",
-      "highest_price": 0.0826,
-      "last_price": 0.0826,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.08736000000000001,
-      "sl_price": 0.06864,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "UNI": {
       "pair": "UNIEUR",
       "asset_code": "UNI",
@@ -29,23 +12,6 @@
       "sl_pct": 12.0,
       "tp_price": 3.8646720000000006,
       "sl_price": 3.036528,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
-    "ESP": {
-      "pair": "ESPEUR",
-      "asset_code": "ESP",
-      "entry_price": 0.07871,
-      "volume": 266.00177,
-      "entry_time": "2026-07-26T17:05:41.546718+00:00",
-      "highest_price": 0.08412,
-      "last_price": 0.08323,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.08815520000000002,
-      "sl_price": 0.0692648,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "min_hold_min": 10,
@@ -67,6 +33,40 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "SAFE": {
+      "pair": "SAFEEUR",
+      "asset_code": "SAFE",
+      "entry_price": 0.078,
+      "volume": 268.42307,
+      "entry_time": "2026-07-26T15:44:33.208294+00:00",
+      "highest_price": 0.0826,
+      "last_price": 0.0826,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.08736000000000001,
+      "sl_price": 0.06864,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
+    "ESP": {
+      "pair": "ESPEUR",
+      "asset_code": "ESP",
+      "entry_price": 0.07871,
+      "volume": 266.00177,
+      "entry_time": "2026-07-26T17:05:41.546718+00:00",
+      "highest_price": 0.08412,
+      "last_price": 0.08351,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.08815520000000002,
+      "sl_price": 0.0692648,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-26",
@@ -75,7 +75,7 @@
   "telegram_update_offset": 64929787,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T17:51:05.080087+00:00",
+  "last_run_time": "2026-07-26T17:51:23.719838+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
