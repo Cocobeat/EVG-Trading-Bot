@@ -16,6 +16,23 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "THQ": {
+      "pair": "THQEUR",
+      "asset_code": "THQ",
+      "entry_price": 0.01139,
+      "volume": 1838.19139,
+      "entry_time": "2026-07-26T15:31:04.424441+00:00",
+      "highest_price": 0.01139,
+      "last_price": 0.01139,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.012756800000000002,
+      "sl_price": 0.010023200000000001,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-26",
@@ -24,7 +41,7 @@
   "telegram_update_offset": 64929787,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T15:29:21.866253+00:00",
+  "last_run_time": "2026-07-26T15:30:55.546504+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
