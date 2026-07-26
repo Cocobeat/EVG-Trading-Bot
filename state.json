@@ -75,9 +75,9 @@
   "telegram_update_offset": 64929788,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T22:21:20.701021+00:00",
+  "last_run_time": "2026-07-26T22:22:23.321356+00:00",
   "cooldowns": {
-    "NOBODY": 50.012190783333324
+    "NOBODY": 48.968518533333324
   },
   "user_profile": "aggressivo"
 }
