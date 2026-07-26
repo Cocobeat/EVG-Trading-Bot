@@ -7,7 +7,7 @@
       "volume": 136.30859375,
       "entry_time": "2026-07-26T14:36:04.876003+00:00",
       "highest_price": 0.1569,
-      "last_price": 0.1567,
+      "last_price": 0.1565,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 0.172032,
@@ -24,7 +24,7 @@
   "telegram_update_offset": 64929787,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T14:59:25.225077+00:00",
+  "last_run_time": "2026-07-26T15:01:06.465300+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
