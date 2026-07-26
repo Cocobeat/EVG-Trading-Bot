@@ -17,23 +17,6 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "ESP": {
-      "pair": "ESPEUR",
-      "asset_code": "ESP",
-      "entry_price": 0.07871,
-      "volume": 266.00177,
-      "entry_time": "2026-07-26T17:05:41.546718+00:00",
-      "highest_price": 0.08543,
-      "last_price": 0.08362,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.08815520000000002,
-      "sl_price": 0.0692648,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "UNI": {
       "pair": "UNIEUR",
       "asset_code": "UNI",
@@ -67,15 +50,32 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "QUAI": {
+      "pair": "QUAIEUR",
+      "asset_code": "QUAI",
+      "entry_price": 0.0137,
+      "volume": 492.75087,
+      "entry_time": "2026-07-26T18:16:07.002334+00:00",
+      "highest_price": 0.0137,
+      "last_price": 0.0137,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.015344000000000002,
+      "sl_price": 0.012056,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-26",
-  "cumulative_pnl_eur": -4.432657920461323,
+  "cumulative_pnl_eur": -3.3526907342613246,
   "trading_paused": false,
   "telegram_update_offset": 64929787,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T18:14:25.250556+00:00",
+  "last_run_time": "2026-07-26T18:15:40.670132+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
