@@ -1,22 +1,5 @@
 {
   "open_positions": {
-    "CFG": {
-      "pair": "CFGEUR",
-      "asset_code": "CFG",
-      "entry_price": 0.1536,
-      "volume": 136.30859375,
-      "entry_time": "2026-07-26T14:36:04.876003+00:00",
-      "highest_price": 0.1624,
-      "last_price": 0.1616,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.172032,
-      "sl_price": 0.13516799999999998,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "QUAI": {
       "pair": "QUAIEUR",
       "asset_code": "QUAI",
@@ -29,6 +12,23 @@
       "sl_pct": 12.0,
       "tp_price": 0.015344000000000002,
       "sl_price": 0.012056,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
+    "CFG": {
+      "pair": "CFGEUR",
+      "asset_code": "CFG",
+      "entry_price": 0.1536,
+      "volume": 136.30859375,
+      "entry_time": "2026-07-26T14:36:04.876003+00:00",
+      "highest_price": 0.1624,
+      "last_price": 0.1616,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.172032,
+      "sl_price": 0.13516799999999998,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "min_hold_min": 10,
@@ -50,6 +50,23 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "ESP": {
+      "pair": "ESPEUR",
+      "asset_code": "ESP",
+      "entry_price": 0.09947,
+      "volume": 210.48557,
+      "entry_time": "2026-07-26T22:16:49.446942+00:00",
+      "highest_price": 0.09947,
+      "last_price": 0.09947,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.11140640000000002,
+      "sl_price": 0.0875336,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-26",
@@ -58,9 +75,9 @@
   "telegram_update_offset": 64929788,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T22:15:45.299823+00:00",
+  "last_run_time": "2026-07-26T22:16:40.023023+00:00",
   "cooldowns": {
-    "NOBODY": 55.60221074999999
+    "NOBODY": 54.69015741666666
   },
   "user_profile": "aggressivo"
 }
