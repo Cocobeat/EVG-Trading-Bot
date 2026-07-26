@@ -1,5 +1,22 @@
 {
   "open_positions": {
+    "UNI": {
+      "pair": "UNIEUR",
+      "asset_code": "UNI",
+      "entry_price": 3.4506,
+      "volume": 6.06764041,
+      "entry_time": "2026-07-26T15:40:53.090645+00:00",
+      "highest_price": 3.4768,
+      "last_price": 3.4309,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 3.8646720000000006,
+      "sl_price": 3.036528,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
     "SAFE": {
       "pair": "SAFEEUR",
       "asset_code": "SAFE",
@@ -17,23 +34,6 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "UNI": {
-      "pair": "UNIEUR",
-      "asset_code": "UNI",
-      "entry_price": 3.4506,
-      "volume": 6.06764041,
-      "entry_time": "2026-07-26T15:40:53.090645+00:00",
-      "highest_price": 3.4768,
-      "last_price": 3.4297,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 3.8646720000000006,
-      "sl_price": 3.036528,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "CFG": {
       "pair": "CFGEUR",
       "asset_code": "CFG",
@@ -41,7 +41,7 @@
       "volume": 136.30859375,
       "entry_time": "2026-07-26T14:36:04.876003+00:00",
       "highest_price": 0.1614,
-      "last_price": 0.1604,
+      "last_price": 0.1601,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 0.172032,
@@ -58,7 +58,7 @@
   "telegram_update_offset": 64929787,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T17:01:44.927022+00:00",
+  "last_run_time": "2026-07-26T17:02:33.697651+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
