@@ -50,6 +50,23 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "ESP": {
+      "pair": "ESPEUR",
+      "asset_code": "ESP",
+      "entry_price": 0.07871,
+      "volume": 266.00177,
+      "entry_time": "2026-07-26T17:05:41.546718+00:00",
+      "highest_price": 0.07871,
+      "last_price": 0.07871,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.08815520000000002,
+      "sl_price": 0.0692648,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-26",
@@ -58,7 +75,7 @@
   "telegram_update_offset": 64929787,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T17:04:24.197718+00:00",
+  "last_run_time": "2026-07-26T17:05:32.005497+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
