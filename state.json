@@ -1,22 +1,5 @@
 {
   "open_positions": {
-    "QUAI": {
-      "pair": "QUAIEUR",
-      "asset_code": "QUAI",
-      "entry_price": 0.0137,
-      "volume": 492.75087,
-      "entry_time": "2026-07-26T18:16:07.002334+00:00",
-      "highest_price": 0.01383,
-      "last_price": 0.01361,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.015344000000000002,
-      "sl_price": 0.012056,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "CFG": {
       "pair": "CFGEUR",
       "asset_code": "CFG",
@@ -34,18 +17,18 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "UNI": {
-      "pair": "UNIEUR",
-      "asset_code": "UNI",
-      "entry_price": 3.4506,
-      "volume": 6.06764041,
-      "entry_time": "2026-07-26T15:40:53.090645+00:00",
-      "highest_price": 3.4768,
-      "last_price": 3.4218,
+    "QUAI": {
+      "pair": "QUAIEUR",
+      "asset_code": "QUAI",
+      "entry_price": 0.0137,
+      "volume": 492.75087,
+      "entry_time": "2026-07-26T18:16:07.002334+00:00",
+      "highest_price": 0.01383,
+      "last_price": 0.01361,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
-      "tp_price": 3.8646720000000006,
-      "sl_price": 3.036528,
+      "tp_price": 0.015344000000000002,
+      "sl_price": 0.012056,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "min_hold_min": 10,
@@ -58,11 +41,28 @@
       "volume": 210.48557,
       "entry_time": "2026-07-26T22:16:49.446942+00:00",
       "highest_price": 0.1004,
-      "last_price": 0.09783,
+      "last_price": 0.09693,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 0.11140640000000002,
       "sl_price": 0.0875336,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
+    "UNI": {
+      "pair": "UNIEUR",
+      "asset_code": "UNI",
+      "entry_price": 3.4506,
+      "volume": 6.06764041,
+      "entry_time": "2026-07-26T15:40:53.090645+00:00",
+      "highest_price": 3.4768,
+      "last_price": 3.4158,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 3.8646720000000006,
+      "sl_price": 3.036528,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "min_hold_min": 10,
@@ -75,9 +75,9 @@
   "telegram_update_offset": 64929788,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 26,
-  "last_run_time": "2026-07-26T22:25:34.089943+00:00",
+  "last_run_time": "2026-07-26T22:26:23.097003+00:00",
   "cooldowns": {
-    "NOBODY": 45.78904208333332
+    "NOBODY": 44.97225774999999
   },
   "user_profile": "aggressivo"
 }
