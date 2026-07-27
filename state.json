@@ -1,39 +1,5 @@
 {
   "open_positions": {
-    "UNI": {
-      "pair": "UNIEUR",
-      "asset_code": "UNI",
-      "entry_price": 3.4506,
-      "volume": 6.06764041,
-      "entry_time": "2026-07-26T15:40:53.090645+00:00",
-      "highest_price": 3.4768,
-      "last_price": 3.4226,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 3.8646720000000006,
-      "sl_price": 3.036528,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
-    "ONDO": {
-      "pair": "ONDOEUR",
-      "asset_code": "ONDO",
-      "entry_price": 0.36089,
-      "volume": 58.0149,
-      "entry_time": "2026-07-27T01:51:04.178418+00:00",
-      "highest_price": 0.36605,
-      "last_price": 0.36444,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.4041968,
-      "sl_price": 0.3175832,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "CFG": {
       "pair": "CFGEUR",
       "asset_code": "CFG",
@@ -46,6 +12,23 @@
       "sl_pct": 12.0,
       "tp_price": 0.172032,
       "sl_price": 0.13516799999999998,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
+    "UNI": {
+      "pair": "UNIEUR",
+      "asset_code": "UNI",
+      "entry_price": 3.4506,
+      "volume": 6.06764041,
+      "entry_time": "2026-07-26T15:40:53.090645+00:00",
+      "highest_price": 3.4768,
+      "last_price": 3.4226,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 3.8646720000000006,
+      "sl_price": 3.036528,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "min_hold_min": 10,
@@ -67,6 +50,23 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "ONDO": {
+      "pair": "ONDOEUR",
+      "asset_code": "ONDO",
+      "entry_price": 0.36089,
+      "volume": 58.0149,
+      "entry_time": "2026-07-27T01:51:04.178418+00:00",
+      "highest_price": 0.36605,
+      "last_price": 0.36444,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.4041968,
+      "sl_price": 0.3175832,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-27",
@@ -75,7 +75,7 @@
   "telegram_update_offset": 64929790,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T08:01:07.139799+00:00",
+  "last_run_time": "2026-07-27T08:01:29.206559+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
