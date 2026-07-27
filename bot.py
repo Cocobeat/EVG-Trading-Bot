@@ -95,7 +95,7 @@ USER_PROFILES = {
         "trail_tiers": [[0, 3.0], [8, 8.0], [20, 12.0]],
         "pump_candle_min_pct": 0.6,
         "pump_volume_surge": 1.1,
-        "pump_rsi_max": 93,
+        "pump_rsi_max": 96,
         "max_total_loss_eur": 80.0,
         "min_ticker_change_pct": 0.5,
         "min_hold_minutes": 10,
@@ -185,7 +185,13 @@ class RateLimitError(Exception):
 
 def get_user_profile(state):
     name = state.get("user_profile", "medio")
-    return USER_PROFILES.get(name, USER_PROFILES["medio"]), name
+    base = USER_PROFILES.get(name, USER_PROFILES["medio"])
+    overrides = state.get("profile_overrides", {}).get(name)
+    if overrides:
+        merged = dict(base)
+        merged.update(overrides)
+        return merged, name
+    return base, name
 
 
 def get_params(regime, state):
@@ -339,6 +345,21 @@ def handle_command(text, state):
                 f"trail {p['trail_arm_pct']}%, {p['max_open_positions']} pos{marker}"
             )
         telegram_send("\n".join(lines), profile_buttons() + control_buttons())
+
+    elif text.startswith("rsi "):
+        up, current = get_user_profile(state)
+        try:
+            val = float(text.split()[1].replace(",", "."))
+        except (IndexError, ValueError):
+            telegram_send("Uso: /rsi 90 (imposta il tetto RSI per il profilo attivo)")
+        else:
+            overrides = state.setdefault("profile_overrides", {})
+            overrides.setdefault(current, {})["pump_rsi_max"] = val
+            telegram_send(
+                f"✅ Tetto RSI per {USER_PROFILES[current]['label']} impostato a {val:.0f} "
+                f"(era {USER_PROFILES[current]['pump_rsi_max']:.0f} di base)",
+                all_buttons(state),
+            )
 
 
 def send_status(state):
@@ -588,6 +609,7 @@ def load_state():
         "auto_wins": 0, "auto_losses": 0, "auto_pnl": 0.0,
         "manual_count": 0, "manual_pnl": 0.0,
     })
+    state.setdefault("profile_overrides", {})
     return state
 
 
@@ -1019,6 +1041,13 @@ def check_buys(positions, pumping, state, params, balances):
     max_buys = CONFIG["MAX_BUYS_PER_RUN"]
     ohlc_checks = 0
     max_ohlc = CONFIG["MAX_OHLC_CHECKS_PER_RUN"]
+    # Contatori diagnostici: perche' i candidati vengono scartati. Servono a
+    # rispondere da log a "perche' oggi non ha comprato nulla?" senza dover
+    # indovinare quale filtro e' stato il collo di bottiglia.
+    reasons = {
+        "gia_posseduto": 0, "saldo_reale": 0, "candela": 0, "correlazione": 0,
+        "volume": 0, "rsi": 0, "trend_1h": 0, "capitale": 0, "altro": 0,
+    }
 
     available_eur = get_eur_balance(balances) if trading_enabled() else None
     if trading_enabled() and available_eur is not None:
@@ -1054,6 +1083,7 @@ def check_buys(positions, pumping, state, params, balances):
 
         base = c["base"]
         if base in positions:
+            reasons["gia_posseduto"] += 1
             continue
 
         # Guardia sul saldo reale: se possediamo gia' un importo non
@@ -1067,6 +1097,7 @@ def check_buys(positions, pumping, state, params, balances):
             if real_bal * c["last_price"] >= CONFIG["MIN_TRADE_EUR"]:
                 print(f"  Skip {base}: saldo reale gia' presente "
                       f"({real_bal:.6f}, non tracciato in state.json)")
+                reasons["saldo_reale"] += 1
                 continue
 
         try:
@@ -1094,6 +1125,7 @@ def check_buys(positions, pumping, state, params, balances):
             continue
         candle_chg = (c_close - c_open) / c_open * 100
         if candle_chg < params["pump_candle_min"]:
+            reasons["candela"] += 1
             time.sleep(0.3)
             continue
 
@@ -1110,6 +1142,7 @@ def check_buys(positions, pumping, state, params, balances):
                     skip_corr = True
                     break
             if skip_corr:
+                reasons["correlazione"] += 1
                 time.sleep(0.3)
                 continue
 
@@ -1120,6 +1153,7 @@ def check_buys(positions, pumping, state, params, balances):
         avg_vol = sum(volumes[-avg_n - 3:-3]) / avg_n
         vol_ratio = volumes[idx] / avg_vol if avg_vol > 0 else 0
         if vol_ratio < params["pump_vol_surge"]:
+            reasons["volume"] += 1
             time.sleep(0.3)
             continue
 
@@ -1130,6 +1164,7 @@ def check_buys(positions, pumping, state, params, balances):
             continue
         rsi = rsis[-1]
         if rsi > params["pump_rsi_max"]:
+            reasons["rsi"] += 1
             time.sleep(0.3)
             continue
 
@@ -1139,6 +1174,7 @@ def check_buys(positions, pumping, state, params, balances):
         # candidati che hanno gia' passato tutto il resto.
         try:
             if not check_trend_1h(c["pair"]):
+                reasons["trend_1h"] += 1
                 time.sleep(0.3)
                 continue
         except RateLimitError as e:
@@ -1155,10 +1191,12 @@ def check_buys(positions, pumping, state, params, balances):
                 eur = capped
                 reduced_for_capital = True
             if eur < CONFIG["MIN_TRADE_EUR"]:
+                reasons["capitale"] += 1
                 continue
 
         vol = round_vol((eur * CONFIG["BUY_SAFETY_MARGIN"]) / price, c["lot_decimals"])
         if vol <= 0 or vol < c["ordermin"]:
+            reasons["altro"] += 1
             continue
 
         order_note = ""
@@ -1220,6 +1258,10 @@ def check_buys(positions, pumping, state, params, balances):
         }
         bought += 1
         time.sleep(0.3)
+
+    if bought == 0 and pumping:
+        scarti = ", ".join(f"{k} {v}" for k, v in reasons.items() if v)
+        print(f"  Scarti candidati: {scarti or 'nessuno (limiti run raggiunti prima)'}")
     return bought
 
 
