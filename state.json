@@ -1,36 +1,5 @@
 {
   "open_positions": {
-    "BOB": {
-      "pair": "BOBEUR",
-      "asset_code": "BOB",
-      "entry_price": 0.00417,
-      "volume": 5020.8633,
-      "entry_time": "2026-07-27T21:40:52.313861+00:00",
-      "highest_price": 0.00429,
-      "last_price": 0.00429,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.014178,
-      "sl_price": 0.0036696000000000003,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "ZBT": {
       "pair": "ZBTEUR",
       "asset_code": "ZBT",
@@ -61,6 +30,37 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "BOB": {
+      "pair": "BOBEUR",
+      "asset_code": "BOB",
+      "entry_price": 0.00417,
+      "volume": 5020.8633,
+      "entry_time": "2026-07-27T21:40:52.313861+00:00",
+      "highest_price": 0.00429,
+      "last_price": 0.00429,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.014178,
+      "sl_price": 0.0036696000000000003,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-27",
@@ -69,7 +69,7 @@
   "telegram_update_offset": 64929811,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T22:46:27.748948+00:00",
+  "last_run_time": "2026-07-27T22:47:17.436143+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
