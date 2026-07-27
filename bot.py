@@ -80,14 +80,22 @@ USER_PROFILES = {
     "aggressivo": {
         "label": "\U0001F525 AGGRESSIVO",
         "eur_per_trade": 30.0,
-        "max_open_positions": 3,
-        "take_profit_pct": 15.0,
+        "max_open_positions": 4,
+        # TP molto alto: e' un backstop di sicurezza, non un tetto reale.
+        # Decide il trailing a fasce (col pavimento breakeven) fin dove far
+        # correre il guadagno.
+        "take_profit_pct": 300.0,
         "stop_loss_pct": 12.0,
         "trail_arm_pct": 4.0,
         "trail_distance_pct": 3.0,
+        # Trailing a fasce: (guadagno dal picco raggiunto, distanza trailing).
+        # Sotto +8% resta stretto (3%) come prima, cosi' i guadagni piccoli
+        # vengono comunque protetti. Sopra, si allarga per lasciar respirare
+        # i pump veri, che ritracciano parecchio mentre salgono.
+        "trail_tiers": [[0, 3.0], [8, 8.0], [20, 12.0]],
         "pump_candle_min_pct": 0.6,
         "pump_volume_surge": 1.1,
-        "pump_rsi_max": 82,
+        "pump_rsi_max": 93,
         "max_total_loss_eur": 80.0,
         "min_ticker_change_pct": 0.5,
         "min_hold_minutes": 10,
@@ -138,6 +146,13 @@ CONFIG = {
     # anche se sono coin "diverse".
     "MAX_POSITION_CORRELATION": 0.75,
     "CORRELATION_LOOKBACK": 30,
+
+    # Pavimento del trailing: una volta armato (guadagno >= trail_arm), lo
+    # stop non scende mai sotto entry + questo margine. Copre le fee di
+    # andata e ritorno (~0.5% round trip) con un piccolo cuscinetto, cosi'
+    # una posizione che e' stata realmente in profitto non si trasforma
+    # mai in una perdita netta.
+    "BREAKEVEN_BUFFER_PCT": 0.6,
 }
 
 RISK_PROFILES = {
@@ -184,6 +199,7 @@ def get_params(regime, state):
         "sl_pct": round(up["stop_loss_pct"] * sl_mult, 1),
         "trail_arm": up["trail_arm_pct"],
         "trail_dist": up["trail_distance_pct"],
+        "trail_tiers": up.get("trail_tiers"),
         "pump_candle_min": up["pump_candle_min_pct"],
         "pump_vol_surge": up["pump_volume_surge"],
         "pump_rsi_max": up["pump_rsi_max"],
@@ -455,6 +471,24 @@ def tick_cooldowns(state, elapsed_minutes):
 
 
 # ================== CHIUSURA POSIZIONI ==================
+
+def trail_distance(peak_gain_pct, pos, params):
+    """
+    Distanza di trailing in funzione di quanto e' salita la posizione.
+    Piccoli guadagni -> trailing stretto (li protegge, come prima).
+    Pump grossi -> trailing largo (li lascia respirare invece di
+    troncarli al primo ritracciamento fisiologico).
+    Se non ci sono fasce definite, torna al comportamento a distanza fissa.
+    """
+    tiers = pos.get("trail_tiers") or params.get("trail_tiers")
+    if not tiers:
+        return pos.get("trail_dist", params["trail_dist"])
+    dist = tiers[0][1]
+    for gain, d in tiers:
+        if peak_gain_pct >= gain:
+            dist = d
+    return dist
+
 
 def record_trade_stat(state, pnl, manual):
     """
@@ -894,7 +928,8 @@ def check_sells(positions, tickers, state, params, balances):
         sl_price = pos.get("sl_price", entry * (1 - pos.get("sl_pct", params["sl_pct"]) / 100))
         tp_price = pos.get("tp_price", entry * (1 + pos.get("tp_pct", params["tp_pct"]) / 100))
         t_arm = pos.get("trail_arm", params["trail_arm"])
-        t_dist = pos.get("trail_dist", params["trail_dist"])
+        peak_gain = (peak - entry) / entry * 100
+        t_dist = trail_distance(peak_gain, pos, params)
 
         hold = minutes_held(pos)
         hold_min = pos.get("min_hold_min", params["min_hold_min"])
@@ -905,10 +940,20 @@ def check_sells(positions, tickers, state, params, balances):
         # TP e trailing attivi sempre
         if price >= tp_price:
             reason = f"Take profit ({chg:+.1f}%)"
-        elif (peak - entry) / entry * 100 >= t_arm:
-            drop = (peak - price) / peak * 100
-            if drop >= t_dist:
-                reason = f"Trailing stop (picco {fp(peak)}, {chg:+.1f}%)"
+        elif peak_gain >= t_arm:
+            # Pavimento: una volta armato il trailing, non si vende mai
+            # sotto il breakeven (+ margine fee) — il pump puo' rimangiarsi
+            # gran parte del guadagno, ma non deve mai portare a casa una
+            # perdita netta dopo essere stato in profitto vero.
+            trail_stop_price = peak * (1 - t_dist / 100)
+            breakeven_price = entry * (1 + CONFIG["BREAKEVEN_BUFFER_PCT"] / 100)
+            effective_stop = max(trail_stop_price, breakeven_price)
+            if price <= effective_stop:
+                if effective_stop > trail_stop_price:
+                    reason = f"Trailing stop (pavimento breakeven, {chg:+.1f}%)"
+                else:
+                    reason = (f"Trailing stop {t_dist:.0f}% "
+                              f"(picco {fp(peak)} +{peak_gain:.0f}%, {chg:+.1f}%)")
 
         # SL attivo solo dopo min_hold_minutes
         if not reason and hold >= hold_min and price <= sl_price:
@@ -1169,6 +1214,7 @@ def check_buys(positions, pumping, state, params, balances):
             "tp_pct": tp, "sl_pct": sl,
             "tp_price": tp_price, "sl_price": sl_price,
             "trail_arm": params["trail_arm"], "trail_dist": params["trail_dist"],
+            "trail_tiers": params.get("trail_tiers"),
             "min_hold_min": params["min_hold_min"],
             "strategy": "pump",
         }
