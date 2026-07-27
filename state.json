@@ -69,10 +69,10 @@
   "last_heartbeat_date": "2026-07-27",
   "cumulative_pnl_eur": -3.281180250736325,
   "trading_paused": false,
-  "telegram_update_offset": 64929807,
+  "telegram_update_offset": 64929808,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T21:38:24.095812+00:00",
+  "last_run_time": "2026-07-27T21:39:23.320901+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
