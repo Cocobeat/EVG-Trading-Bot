@@ -1,22 +1,5 @@
 {
   "open_positions": {
-    "ONDO": {
-      "pair": "ONDOEUR",
-      "asset_code": "ONDO",
-      "entry_price": 0.36089,
-      "volume": 58.0149,
-      "entry_time": "2026-07-27T01:51:04.178418+00:00",
-      "highest_price": 0.36745,
-      "last_price": 0.3526,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.4041968,
-      "sl_price": 0.3175832,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "CFG": {
       "pair": "CFGEUR",
       "asset_code": "CFG",
@@ -70,12 +53,12 @@
     }
   },
   "last_heartbeat_date": "2026-07-27",
-  "cumulative_pnl_eur": -2.3299945979613264,
+  "cumulative_pnl_eur": -2.810938118961324,
   "trading_paused": false,
-  "telegram_update_offset": 64929795,
+  "telegram_update_offset": 64929796,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T19:09:26.459281+00:00",
+  "last_run_time": "2026-07-27T19:10:46.053510+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
