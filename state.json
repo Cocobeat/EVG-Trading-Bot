@@ -1,22 +1,5 @@
 {
   "open_positions": {
-    "QUAI": {
-      "pair": "QUAIEUR",
-      "asset_code": "QUAI",
-      "entry_price": 0.0137,
-      "volume": 492.75087,
-      "entry_time": "2026-07-26T18:16:07.002334+00:00",
-      "highest_price": 0.01383,
-      "last_price": 0.01343,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.015344000000000002,
-      "sl_price": 0.012056,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "UNI": {
       "pair": "UNIEUR",
       "asset_code": "UNI",
@@ -58,7 +41,7 @@
       "volume": 136.30859375,
       "entry_time": "2026-07-26T14:36:04.876003+00:00",
       "highest_price": 0.1643,
-      "last_price": 0.1628,
+      "last_price": 0.1622,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 0.172032,
@@ -67,15 +50,32 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "TRUST": {
+      "pair": "TRUSTEUR",
+      "asset_code": "TRUST",
+      "entry_price": 0.04752,
+      "volume": 440.59343,
+      "entry_time": "2026-07-27T07:24:34.906472+00:00",
+      "highest_price": 0.04752,
+      "last_price": 0.04752,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.0532224,
+      "sl_price": 0.0418176,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-27",
-  "cumulative_pnl_eur": -2.196951863061326,
+  "cumulative_pnl_eur": -2.3299945979613264,
   "trading_paused": false,
-  "telegram_update_offset": 64929789,
+  "telegram_update_offset": 64929790,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T07:23:24.698157+00:00",
+  "last_run_time": "2026-07-27T07:24:25.560349+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo"
 }
