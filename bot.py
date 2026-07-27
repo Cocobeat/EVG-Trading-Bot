@@ -274,11 +274,29 @@ def handle_command(text, state):
         send_status(state)
 
     elif text in ("vendi_tutto", "venditutto", "panic", "emergenza"):
+        telegram_send(
+            "⚠️ Confermi la vendita di TUTTE le posizioni?",
+            [[{"text": "✅ Conferma vendi tutto", "callback_data": "okvenditutto"}],
+             [{"text": "❌ Annulla", "callback_data": "annulla"}]],
+        )
+
+    elif text == "okvenditutto":
         state["trading_paused"] = True
         force_close_all(state)
 
+    elif text.startswith("okvendi_"):
+        force_close_one(state, text[8:].upper())
+
     elif text.startswith("vendi_"):
-        force_close_one(state, text[6:].upper())
+        base = text[6:].upper()
+        telegram_send(
+            f"⚠️ Confermi la vendita di {base}?",
+            [[{"text": f"✅ Conferma vendita {base}", "callback_data": f"okvendi_{base.lower()}"}],
+             [{"text": "❌ Annulla", "callback_data": "annulla"}]],
+        )
+
+    elif text == "annulla":
+        telegram_send("Annullato, nessuna vendita eseguita.", all_buttons(state))
 
     elif text.startswith("profilo_"):
         name = text[8:]
@@ -311,6 +329,7 @@ def send_status(state):
     pos = state.get("open_positions", {})
     regime = state.get("current_regime", "NEUTRAL")
     up, _ = get_user_profile(state)
+    params = get_params(regime, state)
     fgi = state.get("last_fgi")
     cooldowns = state.get("cooldowns", {})
     lines = [
@@ -320,9 +339,20 @@ def send_status(state):
         f"P&L: {state.get('cumulative_pnl_eur', 0.0):+.2f}€ / "
         f"max loss: -{up['max_total_loss_eur']}€",
     ]
+    ts = state.get("trade_stats", {})
+    auto_n = ts.get("auto_wins", 0) + ts.get("auto_losses", 0)
+    if auto_n:
+        wr = ts.get("auto_wins", 0) / auto_n * 100
+        lines.append(
+            f"Bot: {auto_n} trade ({wr:.0f}% win) | P&L bot: {ts.get('auto_pnl', 0.0):+.2f}€"
+        )
+        if ts.get("manual_count"):
+            lines.append(
+                f"Manuali: {ts['manual_count']} ({ts.get('manual_pnl', 0.0):+.2f}€)"
+            )
     btns = []
     if pos:
-        lines.append(f"\n<b>Posizioni ({len(pos)}):</b>")
+        lines.append(f"\n<b>Posizioni ({len(pos)}/{params['max_pos']}):</b>")
         for base, p in pos.items():
             price = p.get("last_price", p["entry_price"])
             chg = (price - p["entry_price"]) / p["entry_price"] * 100
@@ -426,6 +456,27 @@ def tick_cooldowns(state, elapsed_minutes):
 
 # ================== CHIUSURA POSIZIONI ==================
 
+def record_trade_stat(state, pnl, manual):
+    """
+    Tiene traccia separata delle chiusure automatiche (TP/SL/trailing) da
+    quelle manuali (bottone/comando), cosi' il winrate reale del bot non
+    viene sporcato da vendite decise a mano (o click sbagliati).
+    """
+    stats = state.setdefault("trade_stats", {
+        "auto_wins": 0, "auto_losses": 0, "auto_pnl": 0.0,
+        "manual_count": 0, "manual_pnl": 0.0,
+    })
+    if manual:
+        stats["manual_count"] += 1
+        stats["manual_pnl"] += pnl
+    else:
+        if pnl >= 0:
+            stats["auto_wins"] += 1
+        else:
+            stats["auto_losses"] += 1
+        stats["auto_pnl"] += pnl
+
+
 def force_close_all(state):
     positions = state.get("open_positions", {})
     if not positions:
@@ -472,6 +523,7 @@ def force_close_one(state, base, balances=None):
     chg = (price - entry) / entry * 100
     pnl = (price - entry) * sell_vol
     state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl
+    record_trade_stat(state, pnl, manual=True)
     telegram_send(
         f"\U0001F534 VENDUTO {base}\n{fp(entry)} → {fp(price)} ({chg:+.1f}%)\n"
         f"P&L: {pnl:+.2f}€ (cum: {state['cumulative_pnl_eur']:+.2f}€){order_note}",
@@ -498,6 +550,10 @@ def load_state():
     state.setdefault("user_profile", "medio")
     state.setdefault("cooldowns", {})
     state.setdefault("last_run_time", None)
+    state.setdefault("trade_stats", {
+        "auto_wins": 0, "auto_losses": 0, "auto_pnl": 0.0,
+        "manual_count": 0, "manual_pnl": 0.0,
+    })
     return state
 
 
@@ -886,6 +942,7 @@ def check_sells(positions, tickers, state, params, balances):
 
         pnl = (price - entry) * sell_vol
         state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl
+        record_trade_stat(state, pnl, manual=False)
 
         telegram_send(
             f"\U0001F534 <b>VENDI {base}</b>\n{reason}\n"
