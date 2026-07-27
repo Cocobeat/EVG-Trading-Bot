@@ -48,38 +48,52 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "TRUST": {
-      "pair": "TRUSTEUR",
-      "asset_code": "TRUST",
-      "entry_price": 0.04752,
-      "volume": 440.59343,
-      "entry_time": "2026-07-27T07:24:34.906472+00:00",
-      "highest_price": 0.04772,
-      "last_price": 0.04564,
-      "tp_pct": 12.0,
+    "BOB": {
+      "pair": "BOBEUR",
+      "asset_code": "BOB",
+      "entry_price": 0.00417,
+      "volume": 5020.8633,
+      "entry_time": "2026-07-27T21:40:52.313861+00:00",
+      "highest_price": 0.00417,
+      "last_price": 0.00417,
+      "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.0532224,
-      "sl_price": 0.0418176,
+      "tp_price": 0.014178,
+      "sl_price": 0.0036696000000000003,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
       "min_hold_min": 10,
       "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-27",
-  "cumulative_pnl_eur": -3.281180250736325,
+  "cumulative_pnl_eur": -4.109495899136325,
   "trading_paused": false,
-  "telegram_update_offset": 64929808,
+  "telegram_update_offset": 64929810,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T21:39:23.320901+00:00",
+  "last_run_time": "2026-07-27T21:40:40.983743+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
     "auto_wins": 0,
     "auto_losses": 0,
     "auto_pnl": 0.0,
-    "manual_count": 1,
-    "manual_pnl": -0.47024213177500074
+    "manual_count": 2,
+    "manual_pnl": -1.2985577801750008
   }
 }
