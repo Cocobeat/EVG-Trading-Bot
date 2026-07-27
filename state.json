@@ -1,22 +1,5 @@
 {
   "open_positions": {
-    "CFG": {
-      "pair": "CFGEUR",
-      "asset_code": "CFG",
-      "entry_price": 0.1536,
-      "volume": 136.30859375,
-      "entry_time": "2026-07-26T14:36:04.876003+00:00",
-      "highest_price": 0.1652,
-      "last_price": 0.1638,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.172032,
-      "sl_price": 0.13516799999999998,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "TRUST": {
       "pair": "TRUSTEUR",
       "asset_code": "TRUST",
@@ -33,6 +16,23 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "CFG": {
+      "pair": "CFGEUR",
+      "asset_code": "CFG",
+      "entry_price": 0.1536,
+      "volume": 136.30859375,
+      "entry_time": "2026-07-26T14:36:04.876003+00:00",
+      "highest_price": 0.1652,
+      "last_price": 0.1638,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.172032,
+      "sl_price": 0.13516799999999998,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-27",
@@ -41,7 +41,7 @@
   "telegram_update_offset": 64929804,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T21:22:35.783843+00:00",
+  "last_run_time": "2026-07-27T21:23:29.792126+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
