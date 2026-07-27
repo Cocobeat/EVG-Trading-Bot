@@ -1,39 +1,5 @@
 {
   "open_positions": {
-    "TRUST": {
-      "pair": "TRUSTEUR",
-      "asset_code": "TRUST",
-      "entry_price": 0.04752,
-      "volume": 440.59343,
-      "entry_time": "2026-07-27T07:24:34.906472+00:00",
-      "highest_price": 0.04772,
-      "last_price": 0.04587,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.0532224,
-      "sl_price": 0.0418176,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
-    "UNI": {
-      "pair": "UNIEUR",
-      "asset_code": "UNI",
-      "entry_price": 3.4506,
-      "volume": 6.06764041,
-      "entry_time": "2026-07-26T15:40:53.090645+00:00",
-      "highest_price": 3.4768,
-      "last_price": 3.3575,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 3.8646720000000006,
-      "sl_price": 3.036528,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "ONDO": {
       "pair": "ONDOEUR",
       "asset_code": "ONDO",
@@ -67,6 +33,40 @@
       "trail_dist": 3.0,
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "TRUST": {
+      "pair": "TRUSTEUR",
+      "asset_code": "TRUST",
+      "entry_price": 0.04752,
+      "volume": 440.59343,
+      "entry_time": "2026-07-27T07:24:34.906472+00:00",
+      "highest_price": 0.04772,
+      "last_price": 0.04587,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.0532224,
+      "sl_price": 0.0418176,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
+    "UNI": {
+      "pair": "UNIEUR",
+      "asset_code": "UNI",
+      "entry_price": 3.4506,
+      "volume": 6.06764041,
+      "entry_time": "2026-07-26T15:40:53.090645+00:00",
+      "highest_price": 3.4768,
+      "last_price": 3.3575,
+      "tp_pct": 12.0,
+      "sl_pct": 12.0,
+      "tp_price": 3.8646720000000006,
+      "sl_price": 3.036528,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-27",
@@ -75,7 +75,7 @@
   "telegram_update_offset": 64929793,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T19:05:31.941275+00:00",
+  "last_run_time": "2026-07-27T19:05:56.832853+00:00",
   "cooldowns": {},
   "user_profile": "medio"
 }
