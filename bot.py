@@ -95,7 +95,7 @@ USER_PROFILES = {
         "trail_tiers": [[0, 3.0], [8, 8.0], [20, 12.0]],
         "pump_candle_min_pct": 0.6,
         "pump_volume_surge": 1.1,
-        "pump_rsi_max": 93,
+        "pump_rsi_max": 96,
         "max_total_loss_eur": 80.0,
         "min_ticker_change_pct": 0.5,
         "min_hold_minutes": 10,
@@ -185,7 +185,13 @@ class RateLimitError(Exception):
 
 def get_user_profile(state):
     name = state.get("user_profile", "medio")
-    return USER_PROFILES.get(name, USER_PROFILES["medio"]), name
+    base = USER_PROFILES.get(name, USER_PROFILES["medio"])
+    overrides = state.get("profile_overrides", {}).get(name)
+    if overrides:
+        merged = dict(base)
+        merged.update(overrides)
+        return merged, name
+    return base, name
 
 
 def get_params(regime, state):
@@ -339,6 +345,21 @@ def handle_command(text, state):
                 f"trail {p['trail_arm_pct']}%, {p['max_open_positions']} pos{marker}"
             )
         telegram_send("\n".join(lines), profile_buttons() + control_buttons())
+
+    elif text.startswith("rsi "):
+        up, current = get_user_profile(state)
+        try:
+            val = float(text.split()[1].replace(",", "."))
+        except (IndexError, ValueError):
+            telegram_send("Uso: /rsi 90 (imposta il tetto RSI per il profilo attivo)")
+        else:
+            overrides = state.setdefault("profile_overrides", {})
+            overrides.setdefault(current, {})["pump_rsi_max"] = val
+            telegram_send(
+                f"✅ Tetto RSI per {USER_PROFILES[current]['label']} impostato a {val:.0f} "
+                f"(era {USER_PROFILES[current]['pump_rsi_max']:.0f} di base)",
+                all_buttons(state),
+            )
 
 
 def send_status(state):
@@ -588,6 +609,7 @@ def load_state():
         "auto_wins": 0, "auto_losses": 0, "auto_pnl": 0.0,
         "manual_count": 0, "manual_pnl": 0.0,
     })
+    state.setdefault("profile_overrides", {})
     return state
 
 
