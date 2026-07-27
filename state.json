@@ -1,22 +1,5 @@
 {
   "open_positions": {
-    "UNI": {
-      "pair": "UNIEUR",
-      "asset_code": "UNI",
-      "entry_price": 3.4506,
-      "volume": 6.06764041,
-      "entry_time": "2026-07-26T15:40:53.090645+00:00",
-      "highest_price": 3.4768,
-      "last_price": 3.3731,
-      "tp_pct": 12.0,
-      "sl_pct": 12.0,
-      "tp_price": 3.8646720000000006,
-      "sl_price": 3.036528,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "CFG": {
       "pair": "CFGEUR",
       "asset_code": "CFG",
@@ -53,19 +36,19 @@
     }
   },
   "last_heartbeat_date": "2026-07-27",
-  "cumulative_pnl_eur": -2.810938118961324,
+  "cumulative_pnl_eur": -3.281180250736325,
   "trading_paused": false,
-  "telegram_update_offset": 64929803,
+  "telegram_update_offset": 64929804,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T20:27:21.379235+00:00",
+  "last_run_time": "2026-07-27T20:28:31.930402+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
     "auto_wins": 0,
     "auto_losses": 0,
     "auto_pnl": 0.0,
-    "manual_count": 0,
-    "manual_pnl": 0.0
+    "manual_count": 1,
+    "manual_pnl": -0.47024213177500074
   }
 }
