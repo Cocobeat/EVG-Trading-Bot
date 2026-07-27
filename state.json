@@ -24,13 +24,44 @@
       "volume": 136.30859375,
       "entry_time": "2026-07-26T14:36:04.876003+00:00",
       "highest_price": 0.1652,
-      "last_price": 0.163,
+      "last_price": 0.1629,
       "tp_pct": 12.0,
       "sl_pct": 12.0,
       "tp_price": 0.172032,
       "sl_price": 0.13516799999999998,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
+      "min_hold_min": 10,
+      "strategy": "pump"
+    },
+    "ZBT": {
+      "pair": "ZBTEUR",
+      "asset_code": "ZBT",
+      "entry_price": 0.10161,
+      "volume": 206.05255,
+      "entry_time": "2026-07-27T21:36:07.403998+00:00",
+      "highest_price": 0.10161,
+      "last_price": 0.10161,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.345474,
+      "sl_price": 0.0894168,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
       "min_hold_min": 10,
       "strategy": "pump"
     }
@@ -41,7 +72,7 @@
   "telegram_update_offset": 64929806,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T21:34:26.465640+00:00",
+  "last_run_time": "2026-07-27T21:35:33.993384+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
