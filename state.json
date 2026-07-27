@@ -61,6 +61,37 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "REZ": {
+      "pair": "REZEUR",
+      "asset_code": "REZ",
+      "entry_price": 0.002423,
+      "volume": 8640.94098,
+      "entry_time": "2026-07-27T23:31:14.427977+00:00",
+      "highest_price": 0.002423,
+      "last_price": 0.002423,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.0082382,
+      "sl_price": 0.0021322399999999997,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-27",
@@ -69,7 +100,7 @@
   "telegram_update_offset": 64929811,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 30,
-  "last_run_time": "2026-07-27T23:29:22.534231+00:00",
+  "last_run_time": "2026-07-27T23:31:00.242913+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
