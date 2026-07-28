@@ -1,17 +1,17 @@
 {
   "open_positions": {
-    "PRO": {
-      "pair": "PROEUR",
-      "asset_code": "PRO",
-      "entry_price": 0.3541,
-      "volume": 59.12736,
-      "entry_time": "2026-07-28T00:32:37.437192+00:00",
-      "highest_price": 0.3568,
-      "last_price": 0.3401,
+    "REZ": {
+      "pair": "REZEUR",
+      "asset_code": "REZ",
+      "entry_price": 0.002423,
+      "volume": 8640.94098,
+      "entry_time": "2026-07-27T23:31:14.427977+00:00",
+      "highest_price": 0.002566,
+      "last_price": 0.0025,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 1.20394,
-      "sl_price": 0.31160800000000005,
+      "tp_price": 0.0082382,
+      "sl_price": 0.0021322399999999997,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -62,18 +62,18 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "REZ": {
-      "pair": "REZEUR",
-      "asset_code": "REZ",
-      "entry_price": 0.002423,
-      "volume": 8640.94098,
-      "entry_time": "2026-07-27T23:31:14.427977+00:00",
-      "highest_price": 0.002566,
-      "last_price": 0.0025,
+    "PRO": {
+      "pair": "PROEUR",
+      "asset_code": "PRO",
+      "entry_price": 0.3541,
+      "volume": 59.12736,
+      "entry_time": "2026-07-28T00:32:37.437192+00:00",
+      "highest_price": 0.3568,
+      "last_price": 0.3401,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.0082382,
-      "sl_price": 0.0021322399999999997,
+      "tp_price": 1.20394,
+      "sl_price": 0.31160800000000005,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -100,7 +100,7 @@
   "telegram_update_offset": 64929811,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 29,
-  "last_run_time": "2026-07-28T04:01:06.492685+00:00",
+  "last_run_time": "2026-07-28T04:01:27.400202+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
