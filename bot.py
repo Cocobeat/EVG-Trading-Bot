@@ -95,7 +95,7 @@ USER_PROFILES = {
         "trail_tiers": [[0, 3.0], [8, 8.0], [20, 12.0]],
         "pump_candle_min_pct": 0.6,
         "pump_volume_surge": 1.1,
-        "pump_rsi_max": 93,
+        "pump_rsi_max": 96,
         "max_total_loss_eur": 80.0,
         "min_ticker_change_pct": 0.5,
         "min_hold_minutes": 10,
@@ -155,13 +155,23 @@ CONFIG = {
     "BREAKEVEN_BUFFER_PCT": 0.6,
 }
 
+
+# rsi_add: quanto il tetto RSI si sposta rispetto alla base del profilo
+# utente, in base al regime di mercato. In bull i pump restano ipercomprati
+# a lungo mentre il trend continua (RSI alto e' normale, non un segnale di
+# inversione) quindi allarghiamo il tetto per non tagliare fuori i
+# continuation pump. In bear/paura estrema i pump ipercomprati sono piu'
+# spesso rimbalzi morti/dead cat bounce che si sgonfiano in fretta, quindi
+# stringiamo il tetto per essere piu' selettivi sull'ingresso.
 RISK_PROFILES = {
-    "BULL_AGGRESSIVE": {"eur_mult": 1.3, "pos_add": 2, "tp_mult": 1.2, "sl_mult": 1.3},
-    "BULL_MODERATE":   {"eur_mult": 1.15, "pos_add": 1, "tp_mult": 1.1, "sl_mult": 1.1},
-    "NEUTRAL":         {"eur_mult": 1.0, "pos_add": 0, "tp_mult": 1.0, "sl_mult": 1.0},
-    "BEAR_DEFENSIVE":  {"eur_mult": 0.7, "pos_add": -1, "tp_mult": 0.8, "sl_mult": 0.85},
-    "EXTREME_FEAR":    {"eur_mult": 0.5, "pos_add": -1, "tp_mult": 0.7, "sl_mult": 0.75},
+    "BULL_AGGRESSIVE": {"eur_mult": 1.3, "pos_add": 2, "tp_mult": 1.2, "sl_mult": 1.3, "rsi_add": 3},
+    "BULL_MODERATE":   {"eur_mult": 1.15, "pos_add": 1, "tp_mult": 1.1, "sl_mult": 1.1, "rsi_add": 1},
+    "NEUTRAL":         {"eur_mult": 1.0, "pos_add": 0, "tp_mult": 1.0, "sl_mult": 1.0, "rsi_add": 0},
+    "BEAR_DEFENSIVE":  {"eur_mult": 0.7, "pos_add": -1, "tp_mult": 0.8, "sl_mult": 0.85, "rsi_add": -8},
+    "EXTREME_FEAR":    {"eur_mult": 0.5, "pos_add": -1, "tp_mult": 0.7, "sl_mult": 0.75, "rsi_add": -15},
 }
+RSI_MAX_FLOOR = 50
+RSI_MAX_CEILING = 99
 
 REGIME_LABEL = {
     "BULL_AGGRESSIVE": "\U0001F7E2 BULL AGGRESSIVO",
@@ -185,13 +195,21 @@ class RateLimitError(Exception):
 
 def get_user_profile(state):
     name = state.get("user_profile", "medio")
-    return USER_PROFILES.get(name, USER_PROFILES["medio"]), name
+    base = USER_PROFILES.get(name, USER_PROFILES["medio"])
+    overrides = state.get("profile_overrides", {}).get(name)
+    if overrides:
+        merged = dict(base)
+        merged.update(overrides)
+        return merged, name
+    return base, name
 
 
 def get_params(regime, state):
     up, _ = get_user_profile(state)
     rp = RISK_PROFILES.get(regime, RISK_PROFILES["NEUTRAL"])
     sl_mult = max(1.0, rp["sl_mult"])
+    rsi_max = up["pump_rsi_max"] + rp.get("rsi_add", 0)
+    rsi_max = max(RSI_MAX_FLOOR, min(RSI_MAX_CEILING, rsi_max))
     return {
         "eur": round(up["eur_per_trade"] * rp["eur_mult"], 2),
         "max_pos": max(1, up["max_open_positions"] + rp["pos_add"]),
@@ -202,7 +220,8 @@ def get_params(regime, state):
         "trail_tiers": up.get("trail_tiers"),
         "pump_candle_min": up["pump_candle_min_pct"],
         "pump_vol_surge": up["pump_volume_surge"],
-        "pump_rsi_max": up["pump_rsi_max"],
+        "pump_rsi_max": rsi_max,
+        "pump_rsi_base": up["pump_rsi_max"],
         "max_loss": up["max_total_loss_eur"],
         "min_ticker_chg": up["min_ticker_change_pct"],
         "min_hold_min": up.get("min_hold_minutes", 15),
@@ -339,6 +358,24 @@ def handle_command(text, state):
                 f"trail {p['trail_arm_pct']}%, {p['max_open_positions']} pos{marker}"
             )
         telegram_send("\n".join(lines), profile_buttons() + control_buttons())
+
+    elif text.startswith("rsi "):
+        up, current = get_user_profile(state)
+        try:
+            val = float(text.split()[1].replace(",", "."))
+        except (IndexError, ValueError):
+            telegram_send("Uso: /rsi 90 (imposta il tetto RSI per il profilo attivo)")
+        else:
+            overrides = state.setdefault("profile_overrides", {})
+            overrides.setdefault(current, {})["pump_rsi_max"] = val
+            telegram_send(
+                f"✅ Tetto RSI base per {USER_PROFILES[current]['label']} impostato a {val:.0f} "
+                f"(era {USER_PROFILES[current]['pump_rsi_max']:.0f}). "
+                f"Il regime di mercato lo sposta ancora in automatico "
+                f"(es. bear -8, paura estrema -15, bull +1/+3) — guarda "
+                f"\"RSI<\" nel log di ogni run per il valore effettivo.",
+                all_buttons(state),
+            )
 
 
 def send_status(state):
@@ -588,6 +625,7 @@ def load_state():
         "auto_wins": 0, "auto_losses": 0, "auto_pnl": 0.0,
         "manual_count": 0, "manual_pnl": 0.0,
     })
+    state.setdefault("profile_overrides", {})
     return state
 
 
@@ -985,6 +1023,19 @@ def check_sells(positions, tickers, state, params, balances):
                 telegram_send(f"⚠️ Errore vendita {base}: {e}")
                 continue
 
+            # Prezzo/volume di riempimento reale: su coin poco liquide
+            # (spread largo, book sottile) il prezzo del ticker usato per
+            # decidere puo' essere ben diverso da dove l'ordine market e'
+            # davvero eseguito. Senza questo, il P&L riportato (e la soglia
+            # kill-switch) si basano su un prezzo stimato, non reale.
+            if not CONFIG["KRAKEN_DRY_RUN"]:
+                time.sleep(1.5)
+                fill_price, fill_vol = get_order_fill(txid)
+                if fill_price and fill_vol:
+                    price = fill_price
+                    sell_vol = fill_vol
+                    chg = (price - entry) / entry * 100
+
         pnl = (price - entry) * sell_vol
         state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl
         record_trade_stat(state, pnl, manual=False)
@@ -1019,6 +1070,13 @@ def check_buys(positions, pumping, state, params, balances):
     max_buys = CONFIG["MAX_BUYS_PER_RUN"]
     ohlc_checks = 0
     max_ohlc = CONFIG["MAX_OHLC_CHECKS_PER_RUN"]
+    # Contatori diagnostici: perche' i candidati vengono scartati. Servono a
+    # rispondere da log a "perche' oggi non ha comprato nulla?" senza dover
+    # indovinare quale filtro e' stato il collo di bottiglia.
+    reasons = {
+        "gia_posseduto": 0, "saldo_reale": 0, "candela": 0, "correlazione": 0,
+        "volume": 0, "rsi": 0, "trend_1h": 0, "capitale": 0, "altro": 0,
+    }
 
     available_eur = get_eur_balance(balances) if trading_enabled() else None
     if trading_enabled() and available_eur is not None:
@@ -1054,6 +1112,7 @@ def check_buys(positions, pumping, state, params, balances):
 
         base = c["base"]
         if base in positions:
+            reasons["gia_posseduto"] += 1
             continue
 
         # Guardia sul saldo reale: se possediamo gia' un importo non
@@ -1067,6 +1126,7 @@ def check_buys(positions, pumping, state, params, balances):
             if real_bal * c["last_price"] >= CONFIG["MIN_TRADE_EUR"]:
                 print(f"  Skip {base}: saldo reale gia' presente "
                       f"({real_bal:.6f}, non tracciato in state.json)")
+                reasons["saldo_reale"] += 1
                 continue
 
         try:
@@ -1094,6 +1154,7 @@ def check_buys(positions, pumping, state, params, balances):
             continue
         candle_chg = (c_close - c_open) / c_open * 100
         if candle_chg < params["pump_candle_min"]:
+            reasons["candela"] += 1
             time.sleep(0.3)
             continue
 
@@ -1110,6 +1171,7 @@ def check_buys(positions, pumping, state, params, balances):
                     skip_corr = True
                     break
             if skip_corr:
+                reasons["correlazione"] += 1
                 time.sleep(0.3)
                 continue
 
@@ -1120,6 +1182,7 @@ def check_buys(positions, pumping, state, params, balances):
         avg_vol = sum(volumes[-avg_n - 3:-3]) / avg_n
         vol_ratio = volumes[idx] / avg_vol if avg_vol > 0 else 0
         if vol_ratio < params["pump_vol_surge"]:
+            reasons["volume"] += 1
             time.sleep(0.3)
             continue
 
@@ -1130,6 +1193,7 @@ def check_buys(positions, pumping, state, params, balances):
             continue
         rsi = rsis[-1]
         if rsi > params["pump_rsi_max"]:
+            reasons["rsi"] += 1
             time.sleep(0.3)
             continue
 
@@ -1139,6 +1203,7 @@ def check_buys(positions, pumping, state, params, balances):
         # candidati che hanno gia' passato tutto il resto.
         try:
             if not check_trend_1h(c["pair"]):
+                reasons["trend_1h"] += 1
                 time.sleep(0.3)
                 continue
         except RateLimitError as e:
@@ -1155,10 +1220,12 @@ def check_buys(positions, pumping, state, params, balances):
                 eur = capped
                 reduced_for_capital = True
             if eur < CONFIG["MIN_TRADE_EUR"]:
+                reasons["capitale"] += 1
                 continue
 
         vol = round_vol((eur * CONFIG["BUY_SAFETY_MARGIN"]) / price, c["lot_decimals"])
         if vol <= 0 or vol < c["ordermin"]:
+            reasons["altro"] += 1
             continue
 
         order_note = ""
@@ -1220,6 +1287,10 @@ def check_buys(positions, pumping, state, params, balances):
         }
         bought += 1
         time.sleep(0.3)
+
+    if bought == 0 and pumping:
+        scarti = ", ".join(f"{k} {v}" for k, v in reasons.items() if v)
+        print(f"  Scarti candidati: {scarti or 'nessuno (limiti run raggiunti prima)'}")
     return bought
 
 
@@ -1251,8 +1322,11 @@ def _run_body(state):
 
     up, _ = get_user_profile(state)
     print(f"Profilo: {up['label']} | Regime: {REGIME_LABEL.get(regime)}")
+    rsi_note = (f" (base {params['pump_rsi_base']:.0f})"
+                if params["pump_rsi_max"] != params["pump_rsi_base"] else "")
     print(f"Params: {params['eur']}€, max {params['max_pos']} pos, "
           f"TP +{params['tp_pct']}%, SL -{params['sl_pct']}%, "
+          f"RSI<{params['pump_rsi_max']:.0f}{rsi_note}, "
           f"hold {params['min_hold_min']}min, spread <{params['max_spread']}%")
     print(f"Mode: {mode_label()}")
 
