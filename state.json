@@ -31,37 +31,6 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "ZBT": {
-      "pair": "ZBTEUR",
-      "asset_code": "ZBT",
-      "entry_price": 0.10161,
-      "volume": 206.05255,
-      "entry_time": "2026-07-27T21:36:07.403998+00:00",
-      "highest_price": 0.10441,
-      "last_price": 0.09994,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.345474,
-      "sl_price": 0.0894168,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "PRO": {
       "pair": "PROEUR",
       "asset_code": "PRO",
@@ -92,6 +61,37 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "ZBT": {
+      "pair": "ZBTEUR",
+      "asset_code": "ZBT",
+      "entry_price": 0.10161,
+      "volume": 206.05255,
+      "entry_time": "2026-07-27T21:36:07.403998+00:00",
+      "highest_price": 0.10441,
+      "last_price": 0.09994,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.345474,
+      "sl_price": 0.0894168,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-28",
@@ -100,7 +100,7 @@
   "telegram_update_offset": 64929812,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 29,
-  "last_run_time": "2026-07-28T07:01:09.064539+00:00",
+  "last_run_time": "2026-07-28T07:01:28.197507+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
