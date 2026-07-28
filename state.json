@@ -100,7 +100,7 @@
   "telegram_update_offset": 64929815,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 29,
-  "last_run_time": "2026-07-28T16:32:27.021706+00:00",
+  "last_run_time": "2026-07-28T16:33:15.217911+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
@@ -109,5 +109,6 @@
     "auto_pnl": -0.3313344881619962,
     "manual_count": 2,
     "manual_pnl": -1.2985577801750008
-  }
+  },
+  "profile_overrides": {}
 }
