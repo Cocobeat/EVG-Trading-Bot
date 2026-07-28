@@ -100,9 +100,9 @@
   "telegram_update_offset": 64929813,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 29,
-  "last_run_time": "2026-07-28T11:23:28.795660+00:00",
+  "last_run_time": "2026-07-28T11:24:26.308277+00:00",
   "cooldowns": {
-    "BLEND": 5.027645583333326
+    "BLEND": 4.0691019666666595
   },
   "user_profile": "aggressivo",
   "trade_stats": {
