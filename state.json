@@ -1,17 +1,17 @@
 {
   "open_positions": {
-    "ZBT": {
-      "pair": "ZBTEUR",
-      "asset_code": "ZBT",
-      "entry_price": 0.10161,
-      "volume": 206.05255,
-      "entry_time": "2026-07-27T21:36:07.403998+00:00",
-      "highest_price": 0.10441,
-      "last_price": 0.09756,
+    "NOS": {
+      "pair": "NOSEUR",
+      "asset_code": "NOS",
+      "entry_price": 0.2258,
+      "volume": 92.72364,
+      "entry_time": "2026-07-28T12:45:05.098613+00:00",
+      "highest_price": 0.2297,
+      "last_price": 0.2229,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.345474,
-      "sl_price": 0.0894168,
+      "tp_price": 0.76772,
+      "sl_price": 0.198704,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -62,18 +62,18 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "NOS": {
-      "pair": "NOSEUR",
-      "asset_code": "NOS",
-      "entry_price": 0.2258,
-      "volume": 92.72364,
-      "entry_time": "2026-07-28T12:45:05.098613+00:00",
-      "highest_price": 0.2297,
-      "last_price": 0.2229,
+    "ZBT": {
+      "pair": "ZBTEUR",
+      "asset_code": "ZBT",
+      "entry_price": 0.10161,
+      "volume": 206.05255,
+      "entry_time": "2026-07-27T21:36:07.403998+00:00",
+      "highest_price": 0.10441,
+      "last_price": 0.09756,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.76772,
-      "sl_price": 0.198704,
+      "tp_price": 0.345474,
+      "sl_price": 0.0894168,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -100,7 +100,7 @@
   "telegram_update_offset": 64929817,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 29,
-  "last_run_time": "2026-07-28T20:16:26.185350+00:00",
+  "last_run_time": "2026-07-28T20:16:57.590922+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
