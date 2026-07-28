@@ -1,17 +1,17 @@
 {
   "open_positions": {
-    "REZ": {
-      "pair": "REZEUR",
-      "asset_code": "REZ",
-      "entry_price": 0.002423,
-      "volume": 8640.94098,
-      "entry_time": "2026-07-27T23:31:14.427977+00:00",
-      "highest_price": 0.002423,
-      "last_price": 0.002313,
+    "ZBT": {
+      "pair": "ZBTEUR",
+      "asset_code": "ZBT",
+      "entry_price": 0.10161,
+      "volume": 206.05255,
+      "entry_time": "2026-07-27T21:36:07.403998+00:00",
+      "highest_price": 0.10441,
+      "last_price": 0.09943,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.0082382,
-      "sl_price": 0.0021322399999999997,
+      "tp_price": 0.345474,
+      "sl_price": 0.0894168,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -31,18 +31,18 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "ZBT": {
-      "pair": "ZBTEUR",
-      "asset_code": "ZBT",
-      "entry_price": 0.10161,
-      "volume": 206.05255,
-      "entry_time": "2026-07-27T21:36:07.403998+00:00",
-      "highest_price": 0.10441,
-      "last_price": 0.09943,
+    "REZ": {
+      "pair": "REZEUR",
+      "asset_code": "REZ",
+      "entry_price": 0.002423,
+      "volume": 8640.94098,
+      "entry_time": "2026-07-27T23:31:14.427977+00:00",
+      "highest_price": 0.002423,
+      "last_price": 0.002313,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.345474,
-      "sl_price": 0.0894168,
+      "tp_price": 0.0082382,
+      "sl_price": 0.0021322399999999997,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -100,7 +100,7 @@
   "telegram_update_offset": 64929811,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 29,
-  "last_run_time": "2026-07-28T01:01:09.185056+00:00",
+  "last_run_time": "2026-07-28T01:01:31.258820+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
