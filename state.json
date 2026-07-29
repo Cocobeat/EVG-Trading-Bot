@@ -61,52 +61,21 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump"
-    },
-    "NANO": {
-      "pair": "NANOEUR",
-      "asset_code": "NANO",
-      "entry_price": 0.364,
-      "volume": 57.51923076,
-      "entry_time": "2026-07-29T09:47:41.663421+00:00",
-      "highest_price": 0.388,
-      "last_price": 0.376998,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 1.2376,
-      "sl_price": 0.32032,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-29",
-  "cumulative_pnl_eur": -5.405156243298321,
+  "cumulative_pnl_eur": -5.304497589468319,
   "trading_paused": true,
   "telegram_update_offset": 64929821,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 29,
-  "last_run_time": "2026-07-29T17:05:41.395955+00:00",
+  "last_run_time": "2026-07-29T17:06:31.457089+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
-    "auto_wins": 3,
+    "auto_wins": 4,
     "auto_losses": 3,
-    "auto_pnl": -1.2956603441619956,
+    "auto_pnl": -1.195001690331994,
     "manual_count": 2,
     "manual_pnl": -1.2985577801750008
   },
