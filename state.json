@@ -1,17 +1,17 @@
 {
   "open_positions": {
-    "PRO": {
-      "pair": "PROEUR",
-      "asset_code": "PRO",
-      "entry_price": 0.3541,
-      "volume": 59.12736,
-      "entry_time": "2026-07-28T00:32:37.437192+00:00",
-      "highest_price": 0.3568,
-      "last_price": 0.3333,
+    "NOS": {
+      "pair": "NOSEUR",
+      "asset_code": "NOS",
+      "entry_price": 0.2258,
+      "volume": 92.72364,
+      "entry_time": "2026-07-28T12:45:05.098613+00:00",
+      "highest_price": 0.2305,
+      "last_price": 0.2147,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 1.20394,
-      "sl_price": 0.31160800000000005,
+      "tp_price": 0.76772,
+      "sl_price": 0.198704,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -31,18 +31,18 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "NOS": {
-      "pair": "NOSEUR",
-      "asset_code": "NOS",
-      "entry_price": 0.2258,
-      "volume": 92.72364,
-      "entry_time": "2026-07-28T12:45:05.098613+00:00",
-      "highest_price": 0.2305,
-      "last_price": 0.2147,
+    "PRO": {
+      "pair": "PROEUR",
+      "asset_code": "PRO",
+      "entry_price": 0.3541,
+      "volume": 59.12736,
+      "entry_time": "2026-07-28T00:32:37.437192+00:00",
+      "highest_price": 0.3568,
+      "last_price": 0.3333,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.76772,
-      "sl_price": 0.198704,
+      "tp_price": 1.20394,
+      "sl_price": 0.31160800000000005,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -100,7 +100,7 @@
   "telegram_update_offset": 64929820,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 29,
-  "last_run_time": "2026-07-29T09:01:14.315539+00:00",
+  "last_run_time": "2026-07-29T09:01:35.174940+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
