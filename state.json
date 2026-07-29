@@ -1,36 +1,5 @@
 {
   "open_positions": {
-    "NOS": {
-      "pair": "NOSEUR",
-      "asset_code": "NOS",
-      "entry_price": 0.2258,
-      "volume": 92.72364,
-      "entry_time": "2026-07-28T12:45:05.098613+00:00",
-      "highest_price": 0.2381,
-      "last_price": 0.2381,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.76772,
-      "sl_price": 0.198704,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "PRO": {
       "pair": "PROEUR",
       "asset_code": "PRO",
@@ -92,21 +61,52 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "NANO": {
+      "pair": "NANOEUR",
+      "asset_code": "NANO",
+      "entry_price": 0.364,
+      "volume": 57.51923076,
+      "entry_time": "2026-07-29T09:47:41.663421+00:00",
+      "highest_price": 0.364,
+      "last_price": 0.364,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 1.2376,
+      "sl_price": 0.32032,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-29",
-  "cumulative_pnl_eur": -4.4408303872983215,
+  "cumulative_pnl_eur": -5.405156243298321,
   "trading_paused": false,
   "telegram_update_offset": 64929820,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 29,
-  "last_run_time": "2026-07-29T09:46:28.300069+00:00",
+  "last_run_time": "2026-07-29T09:47:25.038620+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
     "auto_wins": 3,
-    "auto_losses": 2,
-    "auto_pnl": -0.3313344881619962,
+    "auto_losses": 3,
+    "auto_pnl": -1.2956603441619956,
     "manual_count": 2,
     "manual_pnl": -1.2985577801750008
   },
