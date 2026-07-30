@@ -63,13 +63,13 @@
       "strategy": "pump"
     }
   },
-  "last_heartbeat_date": "2026-07-29",
+  "last_heartbeat_date": "2026-07-30",
   "cumulative_pnl_eur": -5.304497589468319,
   "trading_paused": true,
   "telegram_update_offset": 64929821,
   "current_regime": "BEAR_DEFENSIVE",
-  "last_fgi": 29,
-  "last_run_time": "2026-07-29T23:59:24.676559+00:00",
+  "last_fgi": 28,
+  "last_run_time": "2026-07-30T00:01:14.748436+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
