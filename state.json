@@ -30,52 +30,21 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump"
-    },
-    "ZBT": {
-      "pair": "ZBTEUR",
-      "asset_code": "ZBT",
-      "entry_price": 0.10161,
-      "volume": 206.05255,
-      "entry_time": "2026-07-27T21:36:07.403998+00:00",
-      "highest_price": 0.10807,
-      "last_price": 0.10524,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.345474,
-      "sl_price": 0.0894168,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-07-30",
-  "cumulative_pnl_eur": -5.304497589468319,
+  "cumulative_pnl_eur": -4.65337153146832,
   "trading_paused": true,
   "telegram_update_offset": 64929821,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 28,
-  "last_run_time": "2026-07-30T18:06:27.932995+00:00",
+  "last_run_time": "2026-07-30T18:07:27.821132+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
-    "auto_wins": 4,
+    "auto_wins": 5,
     "auto_losses": 3,
-    "auto_pnl": -1.195001690331994,
+    "auto_pnl": -0.5438756323319948,
     "manual_count": 2,
     "manual_pnl": -1.2985577801750008
   },
