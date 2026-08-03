@@ -1,17 +1,17 @@
 {
   "open_positions": {
-    "PRO": {
-      "pair": "PROEUR",
-      "asset_code": "PRO",
-      "entry_price": 0.3541,
-      "volume": 59.12736,
-      "entry_time": "2026-07-28T00:32:37.437192+00:00",
-      "highest_price": 0.3568,
-      "last_price": 0.3197,
+    "XMN": {
+      "pair": "XMNEUR",
+      "asset_code": "XMN",
+      "entry_price": 0.00084,
+      "volume": 24925.0,
+      "entry_time": "2026-08-03T12:56:01.651031+00:00",
+      "highest_price": 0.00085,
+      "last_price": 0.00082,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 1.20394,
-      "sl_price": 0.31160800000000005,
+      "tp_price": 0.002856,
+      "sl_price": 0.0007392000000000001,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -31,18 +31,18 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "XMN": {
-      "pair": "XMNEUR",
-      "asset_code": "XMN",
-      "entry_price": 0.00084,
-      "volume": 24925.0,
-      "entry_time": "2026-08-03T12:56:01.651031+00:00",
-      "highest_price": 0.00085,
-      "last_price": 0.00082,
+    "PRO": {
+      "pair": "PROEUR",
+      "asset_code": "PRO",
+      "entry_price": 0.3541,
+      "volume": 59.12736,
+      "entry_time": "2026-07-28T00:32:37.437192+00:00",
+      "highest_price": 0.3568,
+      "last_price": 0.3197,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.002856,
-      "sl_price": 0.0007392000000000001,
+      "tp_price": 1.20394,
+      "sl_price": 0.31160800000000005,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -100,7 +100,7 @@
   "telegram_update_offset": 64929824,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 28,
-  "last_run_time": "2026-08-03T16:31:03.894902+00:00",
+  "last_run_time": "2026-08-03T16:31:30.625514+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
