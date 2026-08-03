@@ -1,17 +1,17 @@
 {
   "open_positions": {
-    "BOB": {
-      "pair": "BOBEUR",
-      "asset_code": "BOB",
-      "entry_price": 0.00349,
-      "volume": 5999.1404,
-      "entry_time": "2026-08-03T12:50:56.831086+00:00",
-      "highest_price": 0.00349,
-      "last_price": 0.00337,
+    "PRO": {
+      "pair": "PROEUR",
+      "asset_code": "PRO",
+      "entry_price": 0.3541,
+      "volume": 59.12736,
+      "entry_time": "2026-07-28T00:32:37.437192+00:00",
+      "highest_price": 0.3568,
+      "last_price": 0.3197,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.011866,
-      "sl_price": 0.0030712,
+      "tp_price": 1.20394,
+      "sl_price": 0.31160800000000005,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -62,18 +62,18 @@
       "min_hold_min": 10,
       "strategy": "pump"
     },
-    "PRO": {
-      "pair": "PROEUR",
-      "asset_code": "PRO",
-      "entry_price": 0.3541,
-      "volume": 59.12736,
-      "entry_time": "2026-07-28T00:32:37.437192+00:00",
-      "highest_price": 0.3568,
-      "last_price": 0.3197,
+    "BOB": {
+      "pair": "BOBEUR",
+      "asset_code": "BOB",
+      "entry_price": 0.00349,
+      "volume": 5999.1404,
+      "entry_time": "2026-08-03T12:50:56.831086+00:00",
+      "highest_price": 0.00349,
+      "last_price": 0.00337,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 1.20394,
-      "sl_price": 0.31160800000000005,
+      "tp_price": 0.011866,
+      "sl_price": 0.0030712,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -100,7 +100,7 @@
   "telegram_update_offset": 64929824,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 28,
-  "last_run_time": "2026-08-03T16:01:09.612537+00:00",
+  "last_run_time": "2026-08-03T16:01:31.928361+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
