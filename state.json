@@ -1,114 +1,20 @@
 {
-  "open_positions": {
-    "PRO": {
-      "pair": "PROEUR",
-      "asset_code": "PRO",
-      "entry_price": 0.3541,
-      "volume": 59.12736,
-      "entry_time": "2026-07-28T00:32:37.437192+00:00",
-      "highest_price": 0.3568,
-      "last_price": 0.3155,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 1.20394,
-      "sl_price": 0.31160800000000005,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
-    "XMN": {
-      "pair": "XMNEUR",
-      "asset_code": "XMN",
-      "entry_price": 0.00084,
-      "volume": 24925.0,
-      "entry_time": "2026-08-03T12:56:01.651031+00:00",
-      "highest_price": 0.00085,
-      "last_price": 0.00082,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.002856,
-      "sl_price": 0.0007392000000000001,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
-    "BOB": {
-      "pair": "BOBEUR",
-      "asset_code": "BOB",
-      "entry_price": 0.00349,
-      "volume": 5999.1404,
-      "entry_time": "2026-08-03T12:50:56.831086+00:00",
-      "highest_price": 0.00349,
-      "last_price": 0.00333,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.011866,
-      "sl_price": 0.0030712,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump"
-    }
-  },
+  "open_positions": {},
   "last_heartbeat_date": "2026-08-04",
-  "cumulative_pnl_eur": -4.65337153146832,
-  "trading_paused": false,
-  "telegram_update_offset": 64929833,
+  "cumulative_pnl_eur": -8.394050091468323,
+  "trading_paused": true,
+  "telegram_update_offset": 64929834,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 25,
-  "last_run_time": "2026-08-04T16:37:29.934244+00:00",
+  "last_run_time": "2026-08-04T16:38:37.647074+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
     "auto_wins": 5,
     "auto_losses": 3,
     "auto_pnl": -0.5438756323319948,
-    "manual_count": 2,
-    "manual_pnl": -1.2985577801750008
+    "manual_count": 5,
+    "manual_pnl": -5.0392363401750035
   },
   "profile_overrides": {}
 }
