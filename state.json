@@ -1,20 +1,20 @@
 {
   "open_positions": {},
-  "last_heartbeat_date": "2026-08-04",
-  "cumulative_pnl_eur": -8.394050091468323,
-  "trading_paused": true,
-  "telegram_update_offset": 64929834,
-  "current_regime": "BEAR_DEFENSIVE",
-  "last_fgi": 25,
-  "last_run_time": "2026-08-04T16:39:23.615921+00:00",
-  "cooldowns": {},
+  "last_heartbeat_date": null,
+  "cumulative_pnl_eur": 0.0,
+  "trading_paused": false,
+  "telegram_update_offset": 0,
+  "current_regime": "NEUTRAL",
+  "last_fgi": null,
   "user_profile": "aggressivo",
+  "cooldowns": {},
+  "last_run_time": null,
   "trade_stats": {
-    "auto_wins": 5,
-    "auto_losses": 3,
-    "auto_pnl": -0.5438756323319948,
-    "manual_count": 5,
-    "manual_pnl": -5.0392363401750035
+    "auto_wins": 0,
+    "auto_losses": 0,
+    "auto_pnl": 0.0,
+    "manual_count": 0,
+    "manual_pnl": 0.0
   },
   "profile_overrides": {}
 }
