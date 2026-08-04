@@ -150,11 +150,33 @@ CONFIG = {
 
     # Pavimento del trailing: una volta armato (guadagno >= trail_arm), lo
     # stop non scende mai sotto entry + questo margine. Copre le fee di
-    # andata e ritorno (~0.5% round trip) con un piccolo cuscinetto, cosi'
-    # una posizione che e' stata realmente in profitto non si trasforma
-    # mai in una perdita netta.
-    "BREAKEVEN_BUFFER_PCT": 0.6,
+    # andata e ritorno su Kraken (taker ~0.4-0.5% a tratta, quindi fino a
+    # ~1%+ di round trip nella fascia di volume tipica del bot, piu' un
+    # cuscinetto per lo slippage sull'esecuzione dello stop). Un margine
+    # troppo stretto qui non e' un pavimento reale: la posizione puo'
+    # comunque chiudersi in perdita netta a fee pagate anche se il prezzo
+    # sta sopra questa soglia.
+    "BREAKEVEN_BUFFER_PCT": 1.5,
+
+    # Stop "catastrofico" piazzato sul server Kraken durante la finestra di
+    # min_hold_minutes, al posto dello stop reale (sl_price). La logica
+    # locale ignora deliberatamente lo SL prima di min_hold (per assorbire
+    # rumore/dip temporanei sul prezzo di ingresso), ma senza questo lo
+    # stop *reale* sul server resterebbe comunque piazzato stretto a
+    # sl_price fin dal minuto zero e potrebbe eseguire la vendita da solo
+    # su Kraken proprio durante la finestra che min_hold dovrebbe
+    # proteggere. Lo stop di grazia e' piu' largo (sl_pct moltiplicato,
+    # con un tetto) cosi' assorbe lo stesso rumore ma resta comunque una
+    # vera rete di sicurezza contro un crollo reale (flash crash/rug pull)
+    # durante l'attesa.
+    "HOLD_GRACE_SL_WIDEN_MULT": 2.0,
+    "HOLD_GRACE_SL_CAP_PCT": 35.0,
 }
+
+
+def catastrophic_sl_pct(sl_pct):
+    """Distanza percentuale dello stop di grazia (vedi HOLD_GRACE_SL_*)."""
+    return min(CONFIG["HOLD_GRACE_SL_CAP_PCT"], sl_pct * CONFIG["HOLD_GRACE_SL_WIDEN_MULT"])
 
 
 # rsi_add: quanto il tetto RSI si sposta rispetto alla base del profilo
@@ -549,6 +571,28 @@ def record_trade_stat(state, pnl, manual):
         stats["auto_pnl"] += pnl
 
 
+def check_kill_switch(state):
+    """
+    Va chiamata dopo OGNI chiusura di posizione, qualunque sia la strada
+    (vendita normale decisa dal bot, stop reale gia' scattato sul server
+    scoperto al run successivo, o chiusura manuale) — prima il controllo
+    viveva solo in un punto, quindi la maggior parte delle uscite (incluse
+    quelle piu' probabili ora che lo stop e' reale sul server) potevano
+    superare la soglia senza che il bot si fermasse mai.
+    """
+    up, _ = get_user_profile(state)
+    max_loss = up["max_total_loss_eur"]
+    if state.get("trading_paused"):
+        return
+    if state.get("cumulative_pnl_eur", 0.0) <= -max_loss:
+        state["trading_paused"] = True
+        telegram_send(
+            f"\U0001F6D1 KILL-SWITCH: {state['cumulative_pnl_eur']:.2f}€ "
+            f"oltre -{max_loss}€\n/riprendi per riattivare.",
+            all_buttons(state),
+        )
+
+
 def force_close_all(state):
     positions = state.get("open_positions", {})
     if not positions:
@@ -561,29 +605,66 @@ def force_close_all(state):
     telegram_send("✅ Tutto chiuso. /riprendi per riattivare.", all_buttons(state))
 
 
-def force_close_one(state, base, balances=None):
+_UNSET = object()  # sentinel: distingue "balances non passato" da "passato esplicitamente None"
+
+
+def force_close_one(state, base, balances=_UNSET):
     positions = state.get("open_positions", {})
     pos = positions.get(base)
     if not pos:
         telegram_send(f"Nessuna posizione per {base}.")
         return
-    if balances is None:
+    if balances is _UNSET:
+        # Chiamata diretta (es. /vendi_X da Telegram), nessun balances gia'
+        # recuperato da chi chiama: lo prendiamo qui.
         balances = get_balances()
+    # Se invece balances e' None perche' force_close_all l'ha gia' provato e
+    # l'API ha fallito, NON riproviamo qui: rifarlo per ogni posizione
+    # martellerebbe di chiamate private un'API gia' in difficolta', senza
+    # ragione di aspettarsi un risultato diverso a distanza di secondi.
     price = pos.get("last_price", pos["entry_price"])
     sell_vol = pos["volume"]
     order_note = ""
+    exit_fee_eur = 0.0
     if trading_enabled():
         asset_code = pos.get("asset_code")
-        if asset_code and asset_code in balances:
-            real_bal = balances[asset_code]
-            if real_bal <= 0:
+        if balances is None:
+            # Balance API in errore/timeout anche dopo il refetch: non
+            # possiamo verificare quanto e' rimasto davvero. Non cancelliamo
+            # la posizione alla cieca — proviamo a vendere il volume nominale
+            # tracciato, come se il saldo reale coincidesse (degradante ma
+            # sicuro: nel peggiore dei casi Kraken rifiuta l'ordine).
+            print(f"[WARN] Saldo reale non disponibile ({base}): vendo il volume tracciato")
+        elif asset_code:
+            # Quantita' reale rimasta rispetto al volume comprato, non il
+            # valore in EUR: un vero calo di prezzo lascia comunque il
+            # volume originale sul conto. Solo se e' rimasto quasi nulla
+            # della QUANTITA' la posizione e' stata chiusa altrove.
+            real_bal = balances.get(asset_code, 0.0)
+            if real_bal < pos["volume"] * 0.05:
                 telegram_send(
-                    f"⚠️ {base}: saldo reale 0, rimuovo la posizione senza ordine "
-                    f"(probabilmente gia' venduta manualmente).",
+                    f"⚠️ {base}: saldo reale ~0, rimuovo la posizione senza ordine "
+                    f"(probabilmente gia' venduta manualmente)."
                 )
+                server_txid = pos.get("server_sl_txid")
+                if server_txid:
+                    cancel_order(server_txid)
                 del positions[base]
                 return
             sell_vol = min(sell_vol, real_bal)
+        # Arrotonda ai decimali di volume ammessi dal pair PRIMA di
+        # ordinare: real_bal viene da Kraken con precisione piena, non
+        # allineata a lot_decimals (pos["volume"] lo era gia' dal buy, ma
+        # min() con real_bal puo' aver introdotto piu' cifre di quante il
+        # pair ne accetti) — senza, Kraken puo' rifiutare l'ordine.
+        sell_vol = round_vol(sell_vol, pos.get("lot_decimals", 8))
+        # Cancella lo stop reale sul server PRIMA di vendere noi: altrimenti
+        # resta un ordine stop orfano su Kraken. Se poi il bot ricompra la
+        # stessa coin, quello stop vecchio potrebbe vendere la posizione
+        # nuova a un prezzo calcolato sulla vecchia entry.
+        server_txid = pos.get("server_sl_txid")
+        if server_txid:
+            cancel_order(server_txid)
         try:
             result = place_order(pos["pair"], "sell", sell_vol)
             txid = result.get("txid", ["(ok)"])[0]
@@ -591,9 +672,20 @@ def force_close_one(state, base, balances=None):
         except Exception as e:
             telegram_send(f"⚠️ Errore vendita {base}: {e}")
             return
+
+        # Prezzo/volume/fee di riempimento reale, non l'ultimo prezzo noto
+        # (che puo' essere del run precedente) — altrimenti il P&L
+        # registrato e' inventato, sia sul prezzo che sulle fee.
+        if not CONFIG["KRAKEN_DRY_RUN"]:
+            time.sleep(1.5)
+            fill_price, fill_vol, fill_fee = get_order_fill(txid)
+            if fill_price and fill_vol:
+                price = fill_price
+                sell_vol = fill_vol
+                exit_fee_eur = fill_fee
     entry = pos["entry_price"]
     chg = (price - entry) / entry * 100
-    pnl = (price - entry) * sell_vol
+    pnl = (price - entry) * sell_vol - pos.get("entry_fee_eur", 0.0) - exit_fee_eur
     state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl
     record_trade_stat(state, pnl, manual=True)
     telegram_send(
@@ -602,6 +694,7 @@ def force_close_one(state, base, balances=None):
         all_buttons(state),
     )
     del positions[base]
+    check_kill_switch(state)
 
 
 # ================== STATO ==================
@@ -806,7 +899,13 @@ def place_stop_order(pair, volume, stop_price, price_decimals):
     return kraken_private("/0/private/AddOrder", data)
 
 
-_DECIMALS_ERROR_RE = re.compile(r"up to (\d+) decimals")
+# Ancorata a "price" (non solo "up to N decimals"): Kraken usa la stessa
+# frase anche per l'errore sui decimali di VOLUME ("volume can only be
+# specified up to N decimals"). Senza l'ancoraggio, un errore di volume
+# verrebbe letto come se fosse sui decimali di prezzo e la correzione
+# verrebbe applicata al parametro sbagliato, senza risolvere il problema
+# reale (e mascherando l'errore vero nel log).
+_DECIMALS_ERROR_RE = re.compile(r"price can only be specified up to (\d+) decimals", re.IGNORECASE)
 
 
 def place_stop_order_safe(pair, volume, stop_price, price_decimals):
@@ -842,7 +941,13 @@ def cancel_order(txid):
 
 
 def get_balances():
-    """Ritorna un dict {asset_code: saldo_float}. Vuoto se non in modalita' live/trading."""
+    """Ritorna un dict {asset_code: saldo_float}. {} se non in modalita'
+    live/trading (stato legittimo: non c'e' nulla da leggere). None se la
+    chiamata a Kraken e' fallita (timeout, rate limit, manutenzione, nonce
+    invalido, ecc.) — stato DIVERSO da {} e va trattato diversamente da chi
+    chiama: un dict vuoto usato per dire "saldi a zero" quando in realta' la
+    richiesta e' fallita farebbe scambiare ogni posizione reale per dust e
+    portarebbe a cancellarla dallo stato senza averla davvero venduta."""
     if not trading_enabled():
         return {}
     try:
@@ -850,29 +955,43 @@ def get_balances():
         return {k: float(v) for k, v in res.items()}
     except Exception as e:
         print(f"[WARN] Balance: {e}")
-        return {}
+        return None
 
 
 def get_eur_balance(balances):
+    # None = saldo davvero sconosciuto (Balance API in errore). 0.0 = saldo
+    # EUR confermato a zero (Kraken omette dalla risposta le valute a saldo
+    # esattamente zero, stesso comportamento gia' gestito per gli asset in
+    # check_sells/check_buys). Le due cose vanno distinte: se "sconosciuto"
+    # tornasse None anche qui, a valle (base_eur, cap su available_eur) il
+    # bot tratterebbe un conto con 0€ liberi come "capitale non verificabile"
+    # e proverebbe comunque un ordine, che Kraken rifiuterebbe ad ogni run.
+    if balances is None:
+        return None
     for key in ("ZEUR", "EUR"):
         if key in balances:
             return balances[key]
-    return None
+    return 0.0
 
 
 def get_order_fill(txid):
-    """Interroga Kraken per prezzo medio e volume eseguito di un ordine chiuso."""
+    """Interroga Kraken per prezzo medio, volume eseguito e fee pagata di un
+    ordine chiuso. La fee (in EUR, valuta quote) va sottratta dal P&L
+    lordo: senza, ogni trade risulta ~0.4-0.5% (per lato, ~0.8-1% andata e
+    ritorno) migliore nei log/nel kill-switch di quanto arrivi davvero sul
+    conto — cumulative_pnl_eur si sarebbe scollato dal saldo reale."""
     try:
         res = kraken_private("/0/private/QueryOrders", {"txid": txid})
         info = res.get(txid)
         if info:
             price = float(info.get("price", 0) or 0)
             vol_exec = float(info.get("vol_exec", 0) or 0)
+            fee = float(info.get("fee", 0) or 0)
             if price > 0 and vol_exec > 0:
-                return price, vol_exec
+                return price, vol_exec, fee
     except Exception as e:
         print(f"[WARN] QueryOrders {txid}: {e}")
-    return None, None
+    return None, None, 0.0
 
 
 def mode_label():
@@ -1057,15 +1176,28 @@ def check_sells(positions, tickers, state, params, balances):
         # sopra sl_price/tp_price locali, la logica sotto non se ne
         # accorgerebbe mai e la posizione resterebbe "fantasma" in
         # state.json per sempre.
-        if trading_enabled():
+        if trading_enabled() and balances is None:
+            # Saldo reale non disponibile in questo run (Balance API in
+            # errore/timeout/rate limit): NON possiamo distinguere "chiuso
+            # fuori dal ciclo normale" da "saldo semplicemente non
+            # verificabile ora". Saltiamo la verifica invece di cancellare
+            # la posizione — si ricontrollera' al prossimo run.
+            print(f"[WARN] Saldo reale non disponibile ({base}): salto verifica ghost-position questo run")
+        elif trading_enabled():
             asset_code = pos.get("asset_code")
-            if asset_code and asset_code in balances and balances[asset_code] <= 0:
-                real_price, real_vol = None, None
+            # Quantita' reale rimasta rispetto al volume comprato, non il
+            # valore in EUR: un vero calo di prezzo (anche -90%) lascia
+            # comunque il volume originale sul conto, cambia solo il suo
+            # valore. Solo se e' rimasto quasi nulla della QUANTITA' (fee
+            # normali tolgono <1%) la posizione e' stata chiusa altrove
+            # (stop server, vendita manuale) — non solo svalutata.
+            if asset_code and balances.get(asset_code, 0.0) < pos["volume"] * 0.05:
+                real_price, real_vol, real_fee = None, None, 0.0
                 server_txid = pos.get("server_sl_txid")
                 if server_txid:
-                    real_price, real_vol = get_order_fill(server_txid)
+                    real_price, real_vol, real_fee = get_order_fill(server_txid)
                 if real_price and real_vol:
-                    close_pnl = (real_price - entry) * real_vol
+                    close_pnl = (real_price - entry) * real_vol - pos.get("entry_fee_eur", 0.0) - real_fee
                     state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + close_pnl
                     record_trade_stat(state, close_pnl, manual=False)
                     close_chg = (real_price - entry) / entry * 100
@@ -1082,7 +1214,16 @@ def check_sells(positions, tickers, state, params, balances):
                         f"⚠️ {base}: saldo reale 0, rimuovo la posizione senza ordine "
                         f"(probabile vendita manuale o dust)."
                     )
+                # Se la chiusura non e' passata dal nostro stop (es. vendita
+                # manuale sul sito Kraken), lo stop resta vivo sul server
+                # senza piu' una posizione dietro — orfano, stesso rischio
+                # gia' corretto in force_close_one. Se invece e' stato lui a
+                # chiudere, e' gia' un ordine concluso e cancel_order() e'
+                # un no-op innocuo.
+                if server_txid:
+                    cancel_order(server_txid)
                 del positions[base]
+                check_kill_switch(state)
                 continue
 
         sl_price = pos.get("sl_price", entry * (1 - pos.get("sl_pct", params["sl_pct"]) / 100))
@@ -1101,15 +1242,35 @@ def check_sells(positions, tickers, state, params, balances):
         if price >= tp_price:
             reason = f"Take profit ({chg:+.1f}%)"
         elif peak_gain >= t_arm:
-            # Pavimento: una volta armato il trailing, non si vende mai
-            # sotto il breakeven (+ margine fee) — il pump puo' rimangiarsi
-            # gran parte del guadagno, ma non deve mai portare a casa una
-            # perdita netta dopo essere stato in profitto vero.
+            # Pavimento: una volta armato il trailing, il bot punta a non
+            # vendere sotto il breakeven (+ margine fee) — il pump puo'
+            # rimangiarsi gran parte del guadagno, ma la logica cerca di
+            # evitare di portare a casa una perdita netta dopo essere
+            # stato in profitto vero. Non e' una garanzia assoluta: questo
+            # controllo gira una volta a run (non in continuo), quindi un
+            # crollo improvviso tra un run e l'altro puo' far eseguire la
+            # vendita sotto questa soglia al prezzo reale trovato al
+            # prossimo controllo, e lo stop reale sul server puo' subire
+            # slippage rispetto al prezzo impostato.
             trail_stop_price = peak * (1 - t_dist / 100)
             breakeven_price = entry * (1 + CONFIG["BREAKEVEN_BUFFER_PCT"] / 100)
             effective_stop = max(trail_stop_price, breakeven_price)
-            if price <= effective_stop:
-                if effective_stop > trail_stop_price:
+            # Il picco puo' essere stato scoperto solo in QUESTO run (vedi
+            # ripescaggio OHLC sopra): su uno spike intra-candela armato e
+            # ricrollato prima che un run precedente potesse sincronizzare
+            # lo stop server al nuovo effective_stop, questo controllo
+            # locale e' l'UNICA cosa che decide la vendita, non il backstop
+            # di un ordine gia' piazzato a quel livello (che semplicemente
+            # non esiste ancora). Se il prezzo e' gia' sotto entry (perdita
+            # vera, non solo sotto il margine fee), rispettiamo min_hold
+            # come farebbe il vero stop-loss: il taglio anticipato del
+            # pavimento resta per proteggere un guadagno reale, non per
+            # uscire in perdita prima che min_hold sia scaduto.
+            if price <= effective_stop and (price > entry or hold >= hold_min):
+                if price < entry:
+                    reason = f"Trailing stop (protezione tardiva, {chg:+.1f}%)"
+                    is_loss = True
+                elif effective_stop > trail_stop_price:
                     reason = f"Trailing stop (pavimento breakeven, {chg:+.1f}%)"
                 else:
                     reason = (f"Trailing stop {t_dist:.0f}% "
@@ -1132,8 +1293,16 @@ def check_sells(positions, tickers, state, params, balances):
                     trail_stop_price = peak * (1 - t_dist / 100)
                     breakeven_price = entry * (1 + CONFIG["BREAKEVEN_BUFFER_PCT"] / 100)
                     desired_stop = max(trail_stop_price, breakeven_price)
-                else:
+                elif hold >= hold_min:
                     desired_stop = sl_price
+                else:
+                    # Ancora in finestra di grazia (min_hold non raggiunto):
+                    # tieni sul server lo stop largo "catastrofico", non
+                    # stringerlo a sl_price. Altrimenti un ripescaggio qui
+                    # (es. dopo un piazzamento fallito al buy) piazzerebbe
+                    # comunque lo stop stretto, vanificando min_hold.
+                    grace_pct = catastrophic_sl_pct(pos.get("sl_pct", params["sl_pct"]))
+                    desired_stop = entry * (1 - grace_pct / 100)
                 old_txid = pos.get("server_sl_txid")
                 old_stop = pos.get("server_sl_price")
                 needs_update = old_txid is None or (
@@ -1150,8 +1319,11 @@ def check_sells(positions, tickers, state, params, balances):
                     # ("Insufficient funds") anche se la posizione e' reale.
                     stop_vol = pos["volume"]
                     asset_code_sl = pos.get("asset_code")
-                    if asset_code_sl and asset_code_sl in balances:
+                    if balances is not None and asset_code_sl and asset_code_sl in balances:
                         stop_vol = min(stop_vol, balances[asset_code_sl])
+                    # Idem check_buys: il saldo reale non e' allineato ai
+                    # decimali di volume ammessi dal pair.
+                    stop_vol = round_vol(stop_vol, pos.get("lot_decimals", 8))
                     try:
                         r, used_dec = place_stop_order_safe(
                             pos["pair"], stop_vol, desired_stop,
@@ -1166,10 +1338,12 @@ def check_sells(positions, tickers, state, params, balances):
 
         sell_vol = pos["volume"]
         order_note = ""
+        exit_fee_eur = 0.0
         if trading_enabled():
             asset_code = pos.get("asset_code")
-            if asset_code and asset_code in balances:
+            if balances is not None and asset_code and asset_code in balances:
                 sell_vol = min(sell_vol, balances[asset_code])
+            sell_vol = round_vol(sell_vol, pos.get("lot_decimals", 8))
             # Cancella lo stop reale prima di vendere noi: altrimenti
             # restano due ordini di vendita vivi sulla stessa posizione
             # (il nostro market e lo stop sul server), rischio di vendere
@@ -1185,20 +1359,22 @@ def check_sells(positions, tickers, state, params, balances):
                 telegram_send(f"⚠️ Errore vendita {base}: {e}")
                 continue
 
-            # Prezzo/volume di riempimento reale: su coin poco liquide
+            # Prezzo/volume/fee di riempimento reale: su coin poco liquide
             # (spread largo, book sottile) il prezzo del ticker usato per
             # decidere puo' essere ben diverso da dove l'ordine market e'
             # davvero eseguito. Senza questo, il P&L riportato (e la soglia
-            # kill-switch) si basano su un prezzo stimato, non reale.
+            # kill-switch) si basano su un prezzo stimato, non reale, e
+            # senza la fee su un lordo che non arriva mai per intero.
             if not CONFIG["KRAKEN_DRY_RUN"]:
                 time.sleep(1.5)
-                fill_price, fill_vol = get_order_fill(txid)
+                fill_price, fill_vol, fill_fee = get_order_fill(txid)
                 if fill_price and fill_vol:
                     price = fill_price
                     sell_vol = fill_vol
+                    exit_fee_eur = fill_fee
                     chg = (price - entry) / entry * 100
 
-        pnl = (price - entry) * sell_vol
+        pnl = (price - entry) * sell_vol - pos.get("entry_fee_eur", 0.0) - exit_fee_eur
         state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + pnl
         record_trade_stat(state, pnl, manual=False)
 
@@ -1216,18 +1392,19 @@ def check_sells(positions, tickers, state, params, balances):
             add_cooldown(state, base)
             print(f"  Cooldown {base}: {CONFIG['COOLDOWN_MINUTES']}min")
 
-        if state["cumulative_pnl_eur"] <= -params["max_loss"]:
-            state["trading_paused"] = True
-            telegram_send(
-                f"\U0001F6D1 KILL-SWITCH: {state['cumulative_pnl_eur']:.2f}€ "
-                f"oltre -{params['max_loss']}€\n/riprendi per riattivare.",
-                all_buttons(state),
-            )
+        check_kill_switch(state)
 
 
 # ================== BUY ==================
 
 def check_buys(positions, pumping, state, params, balances):
+    if trading_enabled() and balances is None:
+        # Balance API in errore/timeout: senza saldo reale non possiamo ne'
+        # calcolare il capitale libero ne' verificare se possediamo gia'
+        # (fuori state.json) l'asset che stiamo per comprare. Meglio saltare
+        # gli acquisti per questo run che comprare alla cieca.
+        print("[WARN] Saldo reale non disponibile: salto tutti gli acquisti questo run")
+        return 0
     bought = 0
     max_buys = CONFIG["MAX_BUYS_PER_RUN"]
     ohlc_checks = 0
@@ -1414,6 +1591,7 @@ def check_buys(positions, pumping, state, params, balances):
             continue
 
         order_note = ""
+        entry_fee_eur = 0.0
         if trading_enabled():
             try:
                 result = place_order(c["pair"], "buy", vol)
@@ -1424,13 +1602,15 @@ def check_buys(positions, pumping, state, params, balances):
                 time.sleep(0.3)
                 continue
 
-            # Prezzo/volume di riempimento reale (solo LIVE, non dry-run)
+            # Prezzo/volume/fee di riempimento reale (solo LIVE, non dry-run).
+            # La fee d'ingresso va tenuta a mente per il P&L netto in uscita.
             if not CONFIG["KRAKEN_DRY_RUN"]:
                 time.sleep(1.5)
-                fill_price, fill_vol = get_order_fill(txid)
+                fill_price, fill_vol, fill_fee = get_order_fill(txid)
                 if fill_price and fill_vol:
                     price = fill_price
                     vol = fill_vol
+                    entry_fee_eur = fill_fee
                 available_eur = max(0.0, available_eur - eur) if available_eur is not None else None
 
         regime = state.get("current_regime", "NEUTRAL")
@@ -1458,12 +1638,21 @@ def check_buys(positions, pumping, state, params, balances):
              *control_buttons()],
         )
 
+        # Lo stop reale sul server parte piu' largo di sl_price ("catastrofico",
+        # vedi HOLD_GRACE_SL_*): la logica locale non applica lo SL prima di
+        # min_hold_minutes per assorbire rumore/dip temporanei, quindi anche
+        # lo stop lato Kraken deve restare largo in quella finestra, altrimenti
+        # eseguirebbe la vendita da solo su un dip che il bot sta ignorando
+        # apposta. Si stringe a sl_price dopo min_hold (vedi check_sells).
+        grace_sl_pct = catastrophic_sl_pct(sl)
+        grace_sl_price = price * (1 - grace_sl_pct / 100)
+
         server_sl_txid = None
         used_pair_decimals = c.get("pair_decimals", 8)
         if trading_enabled() and not CONFIG["KRAKEN_DRY_RUN"]:
             try:
                 sl_result, used_pair_decimals = place_stop_order_safe(
-                    c["pair"], vol, sl_price, c.get("pair_decimals", 8)
+                    c["pair"], vol, grace_sl_price, c.get("pair_decimals", 8)
                 )
                 server_sl_txid = sl_result.get("txid", [None])[0]
             except Exception as e:
@@ -1482,8 +1671,10 @@ def check_buys(positions, pumping, state, params, balances):
             "min_hold_min": params["min_hold_min"],
             "strategy": "pump",
             "server_sl_txid": server_sl_txid,
-            "server_sl_price": sl_price if server_sl_txid else None,
+            "server_sl_price": grace_sl_price if server_sl_txid else None,
             "pair_decimals": used_pair_decimals,
+            "lot_decimals": c.get("lot_decimals", 8),
+            "entry_fee_eur": entry_fee_eur,
         }
         bought += 1
         time.sleep(0.3)
@@ -1539,8 +1730,23 @@ def _run_body(state):
     all_pairs = get_all_eur_pairs()
     print(f"{len(all_pairs)} coppie EUR")
 
-    tickers = get_ticker_batch(all_pairs.keys())
+    # Le posizioni aperte hanno priorita' sul ticker, in una chiamata a
+    # parte prima della scansione dell'intero mercato: se Kraken risponde
+    # 429 a meta' della scansione (che puo' essere diversi batch), un pair
+    # gia' comprato potrebbe finire in un batch successivo mai eseguito —
+    # check_sells lo salterebbe del tutto quel run (niente SL, niente TP,
+    # niente verifica saldo reale) solo perche' la sua coin non era in
+    # cima alla lista di scansione. Il capitale gia' investito viene prima
+    # della ricerca di nuove opportunita'.
+    position_pairs = [pos["pair"] for pos in positions.values() if pos.get("pair")]
+    tickers = get_ticker_batch(position_pairs) if position_pairs else {}
+
+    scan_pairs = [p for p in all_pairs.keys() if p not in tickers]
+    tickers.update(get_ticker_batch(scan_pairs))
     print(f"Ticker: {len(tickers)} coppie")
+    if position_pairs and any(p not in tickers for p in position_pairs):
+        missing = [p for p in position_pairs if p not in tickers]
+        print(f"[WARN] Ticker mancante per posizioni aperte: {missing}")
 
     pumping = scan_pumping(all_pairs, tickers, params, state)
     print(f"{len(pumping)} pump qualificati "
@@ -1555,6 +1761,14 @@ def _run_body(state):
         print(f"  Top: {top}")
 
     check_sells(positions, tickers, state, params, balances)
+
+    # Valutato anche qui, non solo dopo ogni vendita: check_kill_switch()
+    # nei call-site sopra scatta solo quando UNA posizione si chiude in
+    # questo run. Se cumulative_pnl_eur e' gia' oltre soglia ma
+    # trading_paused e' ancora False per qualche motivo (stato importato a
+    # mano, corsa del kill-switch mai scattata), senza questa chiamata il
+    # bot continuerebbe a comprare finche' non si chiude una posizione.
+    check_kill_switch(state)
 
     if state.get("trading_paused"):
         print("In pausa.")
