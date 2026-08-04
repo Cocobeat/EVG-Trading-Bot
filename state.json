@@ -1,39 +1,5 @@
 {
   "open_positions": {
-    "NPC": {
-      "pair": "NPCEUR",
-      "asset_code": "NPC",
-      "entry_price": 0.004853,
-      "volume": 3513.02287,
-      "entry_time": "2026-08-04T16:51:07.217595+00:00",
-      "highest_price": 0.004853,
-      "last_price": 0.004846,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.0165002,
-      "sl_price": 0.00427064,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": null,
-      "server_sl_price": null,
-      "pair_decimals": 8
-    },
     "EAT": {
       "pair": "EATEUR",
       "asset_code": "EAT",
@@ -67,6 +33,40 @@
       "server_sl_txid": null,
       "server_sl_price": null,
       "pair_decimals": 8
+    },
+    "NPC": {
+      "pair": "NPCEUR",
+      "asset_code": "NPC",
+      "entry_price": 0.004853,
+      "volume": 3513.02287,
+      "entry_time": "2026-08-04T16:51:07.217595+00:00",
+      "highest_price": 0.004853,
+      "last_price": 0.004846,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.0165002,
+      "sl_price": 0.00427064,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "pump",
+      "server_sl_txid": null,
+      "server_sl_price": null,
+      "pair_decimals": 8
     }
   },
   "last_heartbeat_date": "2026-08-04",
@@ -77,7 +77,7 @@
   "last_fgi": 25,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-04T17:10:47.923585+00:00",
+  "last_run_time": "2026-08-04T17:11:44.514208+00:00",
   "trade_stats": {
     "auto_wins": 0,
     "auto_losses": 0,
