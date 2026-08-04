@@ -1142,9 +1142,19 @@ def check_sells(positions, tickers, state, params, balances):
                 if needs_update:
                     if old_txid:
                         cancel_order(old_txid)
+                    # Usa il saldo reale se disponibile, non il volume
+                    # nominale registrato all'acquisto: se la fee e' stata
+                    # trattenuta nell'asset invece che in EUR, il volume
+                    # davvero posseduto e' leggermente inferiore, e Kraken
+                    # rifiuta un ordine per piu' di quanto c'e' realmente
+                    # ("Insufficient funds") anche se la posizione e' reale.
+                    stop_vol = pos["volume"]
+                    asset_code_sl = pos.get("asset_code")
+                    if asset_code_sl and asset_code_sl in balances:
+                        stop_vol = min(stop_vol, balances[asset_code_sl])
                     try:
                         r, used_dec = place_stop_order_safe(
-                            pos["pair"], pos["volume"], desired_stop,
+                            pos["pair"], stop_vol, desired_stop,
                             pos.get("pair_decimals", 8)
                         )
                         pos["server_sl_txid"] = r.get("txid", [None])[0]
