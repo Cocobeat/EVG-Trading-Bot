@@ -30,9 +30,9 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump",
-      "server_sl_txid": null,
-      "server_sl_price": null,
-      "pair_decimals": 8
+      "server_sl_txid": "OMAAZC-ND7M4-TKRFSN",
+      "server_sl_price": 0.0052888,
+      "pair_decimals": 5
     },
     "ZEC": {
       "pair": "XZECZEUR",
@@ -41,7 +41,7 @@
       "volume": 0.03898119,
       "entry_time": "2026-08-04T17:21:09.780790+00:00",
       "highest_price": 439.48,
-      "last_price": 438.164,
+      "last_price": 438.719,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
       "tp_price": 1482.7705999999998,
@@ -111,7 +111,7 @@
   "last_fgi": 25,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-04T18:36:30.713558+00:00",
+  "last_run_time": "2026-08-04T18:37:31.801983+00:00",
   "trade_stats": {
     "auto_wins": 0,
     "auto_losses": 0,
