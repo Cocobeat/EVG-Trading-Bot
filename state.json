@@ -1,36 +1,5 @@
 {
   "open_positions": {
-    "XMN": {
-      "pair": "XMNEUR",
-      "asset_code": "XMN",
-      "entry_price": 0.00084,
-      "volume": 24925.0,
-      "entry_time": "2026-08-03T12:56:01.651031+00:00",
-      "highest_price": 0.00085,
-      "last_price": 0.00082,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.002856,
-      "sl_price": 0.0007392000000000001,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump"
-    },
     "BOB": {
       "pair": "BOBEUR",
       "asset_code": "BOB",
@@ -92,15 +61,46 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump"
+    },
+    "XMN": {
+      "pair": "XMNEUR",
+      "asset_code": "XMN",
+      "entry_price": 0.00084,
+      "volume": 24925.0,
+      "entry_time": "2026-08-03T12:56:01.651031+00:00",
+      "highest_price": 0.00085,
+      "last_price": 0.00082,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.002856,
+      "sl_price": 0.0007392000000000001,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "pump"
     }
   },
   "last_heartbeat_date": "2026-08-04",
   "cumulative_pnl_eur": -4.65337153146832,
   "trading_paused": false,
-  "telegram_update_offset": 64929831,
+  "telegram_update_offset": 64929832,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 25,
-  "last_run_time": "2026-08-04T16:31:08.287189+00:00",
+  "last_run_time": "2026-08-04T16:31:29.353476+00:00",
   "cooldowns": {},
   "user_profile": "aggressivo",
   "trade_stats": {
