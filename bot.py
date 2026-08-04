@@ -31,6 +31,7 @@ import hmac
 import json
 import math
 import os
+import re
 import time
 import traceback
 import urllib.parse
@@ -805,6 +806,32 @@ def place_stop_order(pair, volume, stop_price, price_decimals):
     return kraken_private("/0/private/AddOrder", data)
 
 
+_DECIMALS_ERROR_RE = re.compile(r"up to (\d+) decimals")
+
+
+def place_stop_order_safe(pair, volume, stop_price, price_decimals):
+    """Come place_stop_order, ma si autocorregge se i decimali sono
+    sbagliati. Succede per le posizioni aperte prima che pair_decimals
+    venisse letto correttamente: quel valore (sbagliato) resta scritto per
+    sempre in state.json, e il codice nuovo lo rilegge comunque fidandosi.
+    Invece di fallire di nuovo in eterno, se Kraken risponde con l'errore
+    "price can only be specified up to N decimals" estraiamo N dal
+    messaggio stesso e riproviamo subito con quello — niente piu' bisogno
+    di intervento manuale, e la posizione riprende il valore corretto.
+    Ritorna (risultato_ordine, decimali_effettivamente_usati).
+    """
+    try:
+        return place_stop_order(pair, volume, stop_price, price_decimals), price_decimals
+    except Exception as e:
+        m = _DECIMALS_ERROR_RE.search(str(e))
+        if m:
+            corrected = int(m.group(1))
+            if corrected != price_decimals:
+                result = place_stop_order(pair, volume, stop_price, corrected)
+                return result, corrected
+        raise
+
+
 def cancel_order(txid):
     try:
         kraken_private("/0/private/CancelOrder", {"txid": txid})
@@ -1116,10 +1143,13 @@ def check_sells(positions, tickers, state, params, balances):
                     if old_txid:
                         cancel_order(old_txid)
                     try:
-                        r = place_stop_order(pos["pair"], pos["volume"], desired_stop,
-                                              pos.get("pair_decimals", 8))
+                        r, used_dec = place_stop_order_safe(
+                            pos["pair"], pos["volume"], desired_stop,
+                            pos.get("pair_decimals", 8)
+                        )
                         pos["server_sl_txid"] = r.get("txid", [None])[0]
                         pos["server_sl_price"] = desired_stop
+                        pos["pair_decimals"] = used_dec
                     except Exception as e:
                         print(f"[WARN] Piazzamento/aggiornamento stop server {base}: {e}")
             continue
@@ -1419,9 +1449,12 @@ def check_buys(positions, pumping, state, params, balances):
         )
 
         server_sl_txid = None
+        used_pair_decimals = c.get("pair_decimals", 8)
         if trading_enabled() and not CONFIG["KRAKEN_DRY_RUN"]:
             try:
-                sl_result = place_stop_order(c["pair"], vol, sl_price, c.get("pair_decimals", 8))
+                sl_result, used_pair_decimals = place_stop_order_safe(
+                    c["pair"], vol, sl_price, c.get("pair_decimals", 8)
+                )
                 server_sl_txid = sl_result.get("txid", [None])[0]
             except Exception as e:
                 telegram_send(f"⚠️ {base}: stop loss reale su Kraken non piazzato ({e}). "
@@ -1440,7 +1473,7 @@ def check_buys(positions, pumping, state, params, balances):
             "strategy": "pump",
             "server_sl_txid": server_sl_txid,
             "server_sl_price": sl_price if server_sl_txid else None,
-            "pair_decimals": c.get("pair_decimals", 8),
+            "pair_decimals": used_pair_decimals,
         }
         bought += 1
         time.sleep(0.3)
