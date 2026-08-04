@@ -969,6 +969,7 @@ def scan_pumping(all_pairs, tickers, params, state):
         pumping.append({
             "pair": pair_name, "base": base, "asset_code": info.get("asset_code"),
             "ordermin": info["ordermin"], "lot_decimals": info["lot_decimals"],
+            "pair_decimals": info.get("pair_decimals", 8),
             "last_price": last_price, "change_today_pct": chg,
             "vol_eur": vol_eur, "spread_pct": spread,
         })
