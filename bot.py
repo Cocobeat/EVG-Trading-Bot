@@ -43,7 +43,7 @@ import requests
 USER_PROFILES = {
     "sicuro": {
         "label": "\U0001F6E1 SICURO",
-        "eur_per_trade": 15.0,
+        "eur_pct_per_trade": 15.0,
         "max_open_positions": 2,
         "take_profit_pct": 5.0,
         "stop_loss_pct": 4.0,
@@ -61,7 +61,7 @@ USER_PROFILES = {
     },
     "medio": {
         "label": "⚖️ MEDIO",
-        "eur_per_trade": 25.0,
+        "eur_pct_per_trade": 25.0,
         "max_open_positions": 4,
         "take_profit_pct": 10.0,
         "stop_loss_pct": 8.0,
@@ -79,7 +79,7 @@ USER_PROFILES = {
     },
     "aggressivo": {
         "label": "\U0001F525 AGGRESSIVO",
-        "eur_per_trade": 30.0,
+        "eur_pct_per_trade": 30.0,
         "max_open_positions": 4,
         # TP molto alto: e' un backstop di sicurezza, non un tetto reale.
         # Decide il trailing a fasce (col pavimento breakeven) fin dove far
@@ -211,7 +211,7 @@ def get_params(regime, state):
     rsi_max = up["pump_rsi_max"] + rp.get("rsi_add", 0)
     rsi_max = max(RSI_MAX_FLOOR, min(RSI_MAX_CEILING, rsi_max))
     return {
-        "eur": round(up["eur_per_trade"] * rp["eur_mult"], 2),
+        "eur_pct": round(up["eur_pct_per_trade"] * rp["eur_mult"], 2),
         "max_pos": max(1, up["max_open_positions"] + rp["pos_add"]),
         "tp_pct": round(up["take_profit_pct"] * rp["tp_mult"], 1),
         "sl_pct": round(up["stop_loss_pct"] * sl_mult, 1),
@@ -721,6 +721,7 @@ def get_all_eur_pairs():
                 "asset_code": info.get("base"),
                 "ordermin": float(info.get("ordermin", 0) or 0),
                 "lot_decimals": int(info.get("lot_decimals", 8)),
+                "pair_decimals": int(info.get("pair_decimals", 8)),
             }
     return pairs
 
@@ -782,6 +783,35 @@ def place_order(pair, side, volume):
     if CONFIG["KRAKEN_DRY_RUN"]:
         data["validate"] = "true"
     return kraken_private("/0/private/AddOrder", data)
+
+
+def place_stop_order(pair, volume, stop_price, price_decimals):
+    """Piazza uno stop-loss VERO sul server Kraken (non solo calcolato dal
+    bot). Protegge la posizione anche se il bot va offline (crash, run
+    fallita, GitHub Actions giu') — senza questo, tra un run e l'altro
+    (o durante un'interruzione) non c'e' nessuna protezione reale sul
+    mercato, solo nella logica locale. Scatta a mercato quando il prezzo
+    tocca stop_price: niente post-only/limit, per garantire l'esecuzione
+    anche su coin illiquide dove un ordine limite potrebbe non riempirsi
+    mai mentre il prezzo scappa sotto.
+    """
+    price_str = f"{stop_price:.{max(0, price_decimals)}f}"
+    data = {
+        "pair": pair, "type": "sell", "ordertype": "stop-loss",
+        "price": price_str, "volume": f"{volume}",
+    }
+    if CONFIG["KRAKEN_DRY_RUN"]:
+        data["validate"] = "true"
+    return kraken_private("/0/private/AddOrder", data)
+
+
+def cancel_order(txid):
+    try:
+        kraken_private("/0/private/CancelOrder", {"txid": txid})
+        return True
+    except Exception as e:
+        print(f"[WARN] CancelOrder {txid}: {e}")
+        return False
 
 
 def get_balances():
@@ -990,6 +1020,43 @@ def check_sells(positions, tickers, state, params, balances):
 
         peak = pos["highest_price"]
 
+        # Il saldo reale e' la fonte di verita': se e' gia' a zero, qualcosa
+        # ha chiuso la posizione fuori dal ciclo normale del bot — quasi
+        # sempre lo stop-loss reale piazzato su Kraken (protegge anche se il
+        # bot era offline), a volte una vendita manuale. Va controllato ad
+        # ogni run per OGNI posizione, non solo quando la logica locale
+        # decide anche lei di vendere: se il prezzo nel frattempo e' tornato
+        # sopra sl_price/tp_price locali, la logica sotto non se ne
+        # accorgerebbe mai e la posizione resterebbe "fantasma" in
+        # state.json per sempre.
+        if trading_enabled():
+            asset_code = pos.get("asset_code")
+            if asset_code and asset_code in balances and balances[asset_code] <= 0:
+                real_price, real_vol = None, None
+                server_txid = pos.get("server_sl_txid")
+                if server_txid:
+                    real_price, real_vol = get_order_fill(server_txid)
+                if real_price and real_vol:
+                    close_pnl = (real_price - entry) * real_vol
+                    state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + close_pnl
+                    record_trade_stat(state, close_pnl, manual=False)
+                    close_chg = (real_price - entry) / entry * 100
+                    telegram_send(
+                        f"\U0001F534 <b>VENDUTO {base}</b>\nStop loss server (bot offline o run saltata)\n"
+                        f"{fp(entry)} → {fp(real_price)} ({close_chg:+.1f}%)\n"
+                        f"P&L: {close_pnl:+.2f}€ | Cum: {state['cumulative_pnl_eur']:+.2f}€",
+                        all_buttons(state),
+                    )
+                    if close_pnl < 0:
+                        add_cooldown(state, base)
+                else:
+                    telegram_send(
+                        f"⚠️ {base}: saldo reale 0, rimuovo la posizione senza ordine "
+                        f"(probabile vendita manuale o dust)."
+                    )
+                del positions[base]
+                continue
+
         sl_price = pos.get("sl_price", entry * (1 - pos.get("sl_pct", params["sl_pct"]) / 100))
         tp_price = pos.get("tp_price", entry * (1 + pos.get("tp_pct", params["tp_pct"]) / 100))
         t_arm = pos.get("trail_arm", params["trail_arm"])
@@ -1026,6 +1093,27 @@ def check_sells(positions, tickers, state, params, balances):
             is_loss = True
 
         if not reason:
+            # Non vendiamo questo run: se il trailing ha alzato lo stop
+            # effettivo in modo apprezzabile, aggiorniamo anche lo stop
+            # reale sul server Kraken (cancella e ripiazza), cosi' la
+            # protezione offline segue il trailing e non resta ferma al
+            # livello di ingresso.
+            if trading_enabled() and not CONFIG["KRAKEN_DRY_RUN"] and peak_gain >= t_arm:
+                trail_stop_price = peak * (1 - t_dist / 100)
+                breakeven_price = entry * (1 + CONFIG["BREAKEVEN_BUFFER_PCT"] / 100)
+                new_stop = max(trail_stop_price, breakeven_price)
+                old_stop = pos.get("server_sl_price")
+                if old_stop is None or new_stop > old_stop * 1.003:
+                    old_txid = pos.get("server_sl_txid")
+                    if old_txid:
+                        cancel_order(old_txid)
+                    try:
+                        r = place_stop_order(pos["pair"], pos["volume"], new_stop,
+                                              pos.get("pair_decimals", 8))
+                        pos["server_sl_txid"] = r.get("txid", [None])[0]
+                        pos["server_sl_price"] = new_stop
+                    except Exception as e:
+                        print(f"[WARN] Aggiornamento stop server {base}: {e}")
             continue
 
         sell_vol = pos["volume"]
@@ -1033,15 +1121,14 @@ def check_sells(positions, tickers, state, params, balances):
         if trading_enabled():
             asset_code = pos.get("asset_code")
             if asset_code and asset_code in balances:
-                real_bal = balances[asset_code]
-                if real_bal <= 0:
-                    telegram_send(
-                        f"⚠️ {base}: saldo reale 0, rimuovo la posizione senza ordine "
-                        f"(probabile vendita manuale o dust)."
-                    )
-                    del positions[base]
-                    continue
-                sell_vol = min(sell_vol, real_bal)
+                sell_vol = min(sell_vol, balances[asset_code])
+            # Cancella lo stop reale prima di vendere noi: altrimenti
+            # restano due ordini di vendita vivi sulla stessa posizione
+            # (il nostro market e lo stop sul server), rischio di vendere
+            # due volte o che il secondo ordine fallisca a vuoto.
+            server_txid = pos.get("server_sl_txid")
+            if server_txid:
+                cancel_order(server_txid)
             try:
                 result = place_order(pos["pair"], "sell", sell_vol)
                 txid = result.get("txid", ["(ok)"])[0]
@@ -1108,6 +1195,28 @@ def check_buys(positions, pumping, state, params, balances):
     available_eur = get_eur_balance(balances) if trading_enabled() else None
     if trading_enabled() and available_eur is not None:
         print(f"Balance EUR disponibile: {available_eur:.2f}€")
+
+    # Size per trade proporzionale al capitale TOTALE (EUR liberi + valore
+    # a mercato delle posizioni gia' aperte), non un euro fisso — cosi' se
+    # il capitale scende (o sale) il size si adatta da solo, invece di
+    # restare fisso a 30€ anche quando il conto e' sceso a 80€. Il valore
+    # delle posizioni aperte usa "last_price", gia' aggiornato da
+    # check_sells poco prima nello stesso ciclo — nessuna chiamata API in
+    # piu' necessaria.
+    positions_value = sum(
+        pos.get("last_price", pos.get("entry_price", 0)) * pos.get("volume", 0)
+        for pos in positions.values()
+    )
+    if available_eur is not None:
+        total_capital = available_eur + positions_value
+    else:
+        # Non in trading live (segnale/dry-run senza saldo reale): usa il
+        # capitale "virtuale" tracciato solo dalle posizioni note.
+        total_capital = positions_value if positions_value > 0 else None
+    base_eur = (
+        round(total_capital * params["eur_pct"] / 100, 2)
+        if total_capital else round(100 * params["eur_pct"] / 100, 2)
+    )
 
     # Rendimenti recenti delle posizioni gia' aperte, per il filtro di
     # correlazione (vedi CONFIG["MAX_POSITION_CORRELATION"]). Calcolati una
@@ -1237,9 +1346,10 @@ def check_buys(positions, pumping, state, params, balances):
             print(f"[RATE LIMIT] {e} — interrompo la scansione acquisti per questo run")
             break
 
-        # Dimensiona l'ordine, capato al capitale reale disponibile
+        # Dimensiona l'ordine come % del capitale totale, capato al capitale
+        # EUR reale disponibile in questo momento
         price = c["last_price"]
-        eur = params["eur"]
+        eur = base_eur
         reduced_for_capital = False
         if trading_enabled() and available_eur is not None:
             capped = max(0.0, available_eur - 1.0)  # margine di sicurezza per fee
@@ -1300,6 +1410,15 @@ def check_buys(positions, pumping, state, params, balances):
              *control_buttons()],
         )
 
+        server_sl_txid = None
+        if trading_enabled() and not CONFIG["KRAKEN_DRY_RUN"]:
+            try:
+                sl_result = place_stop_order(c["pair"], vol, sl_price, c.get("pair_decimals", 8))
+                server_sl_txid = sl_result.get("txid", [None])[0]
+            except Exception as e:
+                telegram_send(f"⚠️ {base}: stop loss reale su Kraken non piazzato ({e}). "
+                               f"Protetto solo dalla logica del bot, non dal server.")
+
         positions[base] = {
             "pair": c["pair"], "asset_code": c.get("asset_code"),
             "entry_price": price, "volume": vol,
@@ -1311,6 +1430,9 @@ def check_buys(positions, pumping, state, params, balances):
             "trail_tiers": params.get("trail_tiers"),
             "min_hold_min": params["min_hold_min"],
             "strategy": "pump",
+            "server_sl_txid": server_sl_txid,
+            "server_sl_price": sl_price if server_sl_txid else None,
+            "pair_decimals": c.get("pair_decimals", 8),
         }
         bought += 1
         time.sleep(0.3)
@@ -1351,7 +1473,7 @@ def _run_body(state):
     print(f"Profilo: {up['label']} | Regime: {REGIME_LABEL.get(regime)}")
     rsi_note = (f" (base {params['pump_rsi_base']:.0f})"
                 if params["pump_rsi_max"] != params["pump_rsi_base"] else "")
-    print(f"Params: {params['eur']}€, max {params['max_pos']} pos, "
+    print(f"Params: {params['eur_pct']}% capitale/trade, max {params['max_pos']} pos, "
           f"TP +{params['tp_pct']}%, SL -{params['sl_pct']}%, "
           f"RSI<{params['pump_rsi_max']:.0f}{rsi_note}, "
           f"hold {params['min_hold_min']}min, spread <{params['max_spread']}%")
@@ -1409,7 +1531,7 @@ def _run_body(state):
             f"✅ <b>Bot v5.1 ({mode_label()})</b>\n"
             f"{REGIME_LABEL.get(regime, regime)} | {up['label']}\n"
             f"F&G: {fgi if fgi is not None else '?'} | BTC: {btc_arr}\n"
-            f"{params['eur']:.0f}€/trade | max {params['max_pos']} pos | "
+            f"{params['eur_pct']:.0f}% capitale/trade | max {params['max_pos']} pos | "
             f"TP +{params['tp_pct']:.0f}% SL -{params['sl_pct']:.0f}%\n"
             f"Trail: {params['trail_arm']}%/{params['trail_dist']}% | "
             f"Hold: {params['min_hold_min']}min | Spread <{params['max_spread']}%\n"
