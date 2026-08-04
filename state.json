@@ -1,123 +1,20 @@
 {
-  "open_positions": {
-    "ZEC": {
-      "pair": "XZECZEUR",
-      "asset_code": "XZEC",
-      "entry_price": 436.109,
-      "volume": 0.03898119,
-      "entry_time": "2026-08-04T17:21:09.780790+00:00",
-      "highest_price": 441.767,
-      "last_price": 440.704,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 1482.7705999999998,
-      "sl_price": 383.77592,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": "ORDYKN-U5CLG-PCGQCY",
-      "server_sl_price": 383.77592,
-      "pair_decimals": 3
-    },
-    "NPC": {
-      "pair": "NPCEUR",
-      "asset_code": "NPC",
-      "entry_price": 0.004853,
-      "volume": 3513.02287,
-      "entry_time": "2026-08-04T16:51:07.217595+00:00",
-      "highest_price": 0.005044,
-      "last_price": 0.004955,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.0165002,
-      "sl_price": 0.00427064,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": "OTZYI3-OPPXS-MMHIFL",
-      "server_sl_price": 0.00427064,
-      "pair_decimals": 6
-    },
-    "EAT": {
-      "pair": "EATEUR",
-      "asset_code": "EAT",
-      "entry_price": 0.00601,
-      "volume": 2833.40432,
-      "entry_time": "2026-08-04T17:05:56.570328+00:00",
-      "highest_price": 0.00604,
-      "last_price": 0.00583,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.020433999999999997,
-      "sl_price": 0.0052888,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": "OMAAZC-ND7M4-TKRFSN",
-      "server_sl_price": 0.0052888,
-      "pair_decimals": 5
-    }
-  },
+  "open_positions": {},
   "last_heartbeat_date": "2026-08-04",
-  "cumulative_pnl_eur": 0.0,
+  "cumulative_pnl_eur": 0.02743412679000401,
   "trading_paused": true,
-  "telegram_update_offset": 64929849,
+  "telegram_update_offset": 64929851,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 25,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-04T19:52:32.015095+00:00",
+  "last_run_time": "2026-08-04T19:53:31.108059+00:00",
   "trade_stats": {
     "auto_wins": 0,
     "auto_losses": 0,
     "auto_pnl": 0.0,
-    "manual_count": 0,
-    "manual_pnl": 0.0
+    "manual_count": 3,
+    "manual_pnl": 0.02743412679000401
   },
   "profile_overrides": {}
 }
