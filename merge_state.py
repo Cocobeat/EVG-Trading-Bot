@@ -88,6 +88,31 @@ def merge(base, local, remote):
     cooldowns.update(local.get("cooldowns", {}) or {})
     out["cooldowns"] = cooldowns
 
+    # trade_stats: stesso principio di cumulative_pnl_eur, ma su piu' campi.
+    # Senza questo, un conflitto di push butta via silenziosamente
+    # l'incremento di QUESTA run (un trade chiuso davvero non risulta piu'
+    # da nessuna parte), rendendo /stato inaffidabile.
+    stats_fields = {
+        "auto_wins": 0, "auto_losses": 0, "auto_pnl": 0.0,
+        "manual_count": 0, "manual_pnl": 0.0,
+    }
+    base_stats = base.get("trade_stats", {}) or {}
+    local_stats = local.get("trade_stats", {}) or {}
+    remote_stats = remote.get("trade_stats", {}) or {}
+    merged_stats = {}
+    for field, default in stats_fields.items():
+        delta = local_stats.get(field, default) - base_stats.get(field, default)
+        merged_stats[field] = remote_stats.get(field, default) + delta
+    out["trade_stats"] = merged_stats
+
+    # profile_overrides: dizionario nested, stesso schema degli altri campi
+    # scalari (se questa run l'ha cambiato rispetto alla base, vince questa
+    # run, altrimenti resta il remoto piu' fresco).
+    if local.get("profile_overrides") != base.get("profile_overrides"):
+        out["profile_overrides"] = local.get("profile_overrides", {})
+    else:
+        out["profile_overrides"] = remote.get("profile_overrides", {})
+
     for field in ("trading_paused", "user_profile", "current_regime",
                   "last_fgi", "last_heartbeat_date", "last_run_time"):
         if local.get(field) != base.get(field):
