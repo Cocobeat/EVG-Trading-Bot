@@ -721,6 +721,7 @@ def get_all_eur_pairs():
                 "asset_code": info.get("base"),
                 "ordermin": float(info.get("ordermin", 0) or 0),
                 "lot_decimals": int(info.get("lot_decimals", 8)),
+                "pair_decimals": int(info.get("pair_decimals", 8)),
             }
     return pairs
 
@@ -782,6 +783,35 @@ def place_order(pair, side, volume):
     if CONFIG["KRAKEN_DRY_RUN"]:
         data["validate"] = "true"
     return kraken_private("/0/private/AddOrder", data)
+
+
+def place_stop_order(pair, volume, stop_price, price_decimals):
+    """Piazza uno stop-loss VERO sul server Kraken (non solo calcolato dal
+    bot). Protegge la posizione anche se il bot va offline (crash, run
+    fallita, GitHub Actions giu') — senza questo, tra un run e l'altro
+    (o durante un'interruzione) non c'e' nessuna protezione reale sul
+    mercato, solo nella logica locale. Scatta a mercato quando il prezzo
+    tocca stop_price: niente post-only/limit, per garantire l'esecuzione
+    anche su coin illiquide dove un ordine limite potrebbe non riempirsi
+    mai mentre il prezzo scappa sotto.
+    """
+    price_str = f"{stop_price:.{max(0, price_decimals)}f}"
+    data = {
+        "pair": pair, "type": "sell", "ordertype": "stop-loss",
+        "price": price_str, "volume": f"{volume}",
+    }
+    if CONFIG["KRAKEN_DRY_RUN"]:
+        data["validate"] = "true"
+    return kraken_private("/0/private/AddOrder", data)
+
+
+def cancel_order(txid):
+    try:
+        kraken_private("/0/private/CancelOrder", {"txid": txid})
+        return True
+    except Exception as e:
+        print(f"[WARN] CancelOrder {txid}: {e}")
+        return False
 
 
 def get_balances():
@@ -990,6 +1020,43 @@ def check_sells(positions, tickers, state, params, balances):
 
         peak = pos["highest_price"]
 
+        # Il saldo reale e' la fonte di verita': se e' gia' a zero, qualcosa
+        # ha chiuso la posizione fuori dal ciclo normale del bot — quasi
+        # sempre lo stop-loss reale piazzato su Kraken (protegge anche se il
+        # bot era offline), a volte una vendita manuale. Va controllato ad
+        # ogni run per OGNI posizione, non solo quando la logica locale
+        # decide anche lei di vendere: se il prezzo nel frattempo e' tornato
+        # sopra sl_price/tp_price locali, la logica sotto non se ne
+        # accorgerebbe mai e la posizione resterebbe "fantasma" in
+        # state.json per sempre.
+        if trading_enabled():
+            asset_code = pos.get("asset_code")
+            if asset_code and asset_code in balances and balances[asset_code] <= 0:
+                real_price, real_vol = None, None
+                server_txid = pos.get("server_sl_txid")
+                if server_txid:
+                    real_price, real_vol = get_order_fill(server_txid)
+                if real_price and real_vol:
+                    close_pnl = (real_price - entry) * real_vol
+                    state["cumulative_pnl_eur"] = state.get("cumulative_pnl_eur", 0.0) + close_pnl
+                    record_trade_stat(state, close_pnl, manual=False)
+                    close_chg = (real_price - entry) / entry * 100
+                    telegram_send(
+                        f"\U0001F534 <b>VENDUTO {base}</b>\nStop loss server (bot offline o run saltata)\n"
+                        f"{fp(entry)} → {fp(real_price)} ({close_chg:+.1f}%)\n"
+                        f"P&L: {close_pnl:+.2f}€ | Cum: {state['cumulative_pnl_eur']:+.2f}€",
+                        all_buttons(state),
+                    )
+                    if close_pnl < 0:
+                        add_cooldown(state, base)
+                else:
+                    telegram_send(
+                        f"⚠️ {base}: saldo reale 0, rimuovo la posizione senza ordine "
+                        f"(probabile vendita manuale o dust)."
+                    )
+                del positions[base]
+                continue
+
         sl_price = pos.get("sl_price", entry * (1 - pos.get("sl_pct", params["sl_pct"]) / 100))
         tp_price = pos.get("tp_price", entry * (1 + pos.get("tp_pct", params["tp_pct"]) / 100))
         t_arm = pos.get("trail_arm", params["trail_arm"])
@@ -1026,6 +1093,27 @@ def check_sells(positions, tickers, state, params, balances):
             is_loss = True
 
         if not reason:
+            # Non vendiamo questo run: se il trailing ha alzato lo stop
+            # effettivo in modo apprezzabile, aggiorniamo anche lo stop
+            # reale sul server Kraken (cancella e ripiazza), cosi' la
+            # protezione offline segue il trailing e non resta ferma al
+            # livello di ingresso.
+            if trading_enabled() and not CONFIG["KRAKEN_DRY_RUN"] and peak_gain >= t_arm:
+                trail_stop_price = peak * (1 - t_dist / 100)
+                breakeven_price = entry * (1 + CONFIG["BREAKEVEN_BUFFER_PCT"] / 100)
+                new_stop = max(trail_stop_price, breakeven_price)
+                old_stop = pos.get("server_sl_price")
+                if old_stop is None or new_stop > old_stop * 1.003:
+                    old_txid = pos.get("server_sl_txid")
+                    if old_txid:
+                        cancel_order(old_txid)
+                    try:
+                        r = place_stop_order(pos["pair"], pos["volume"], new_stop,
+                                              pos.get("pair_decimals", 8))
+                        pos["server_sl_txid"] = r.get("txid", [None])[0]
+                        pos["server_sl_price"] = new_stop
+                    except Exception as e:
+                        print(f"[WARN] Aggiornamento stop server {base}: {e}")
             continue
 
         sell_vol = pos["volume"]
@@ -1033,15 +1121,14 @@ def check_sells(positions, tickers, state, params, balances):
         if trading_enabled():
             asset_code = pos.get("asset_code")
             if asset_code and asset_code in balances:
-                real_bal = balances[asset_code]
-                if real_bal <= 0:
-                    telegram_send(
-                        f"⚠️ {base}: saldo reale 0, rimuovo la posizione senza ordine "
-                        f"(probabile vendita manuale o dust)."
-                    )
-                    del positions[base]
-                    continue
-                sell_vol = min(sell_vol, real_bal)
+                sell_vol = min(sell_vol, balances[asset_code])
+            # Cancella lo stop reale prima di vendere noi: altrimenti
+            # restano due ordini di vendita vivi sulla stessa posizione
+            # (il nostro market e lo stop sul server), rischio di vendere
+            # due volte o che il secondo ordine fallisca a vuoto.
+            server_txid = pos.get("server_sl_txid")
+            if server_txid:
+                cancel_order(server_txid)
             try:
                 result = place_order(pos["pair"], "sell", sell_vol)
                 txid = result.get("txid", ["(ok)"])[0]
@@ -1300,6 +1387,15 @@ def check_buys(positions, pumping, state, params, balances):
              *control_buttons()],
         )
 
+        server_sl_txid = None
+        if trading_enabled() and not CONFIG["KRAKEN_DRY_RUN"]:
+            try:
+                sl_result = place_stop_order(c["pair"], vol, sl_price, c.get("pair_decimals", 8))
+                server_sl_txid = sl_result.get("txid", [None])[0]
+            except Exception as e:
+                telegram_send(f"⚠️ {base}: stop loss reale su Kraken non piazzato ({e}). "
+                               f"Protetto solo dalla logica del bot, non dal server.")
+
         positions[base] = {
             "pair": c["pair"], "asset_code": c.get("asset_code"),
             "entry_price": price, "volume": vol,
@@ -1311,6 +1407,9 @@ def check_buys(positions, pumping, state, params, balances):
             "trail_tiers": params.get("trail_tiers"),
             "min_hold_min": params["min_hold_min"],
             "strategy": "pump",
+            "server_sl_txid": server_sl_txid,
+            "server_sl_price": sl_price if server_sl_txid else None,
+            "pair_decimals": c.get("pair_decimals", 8),
         }
         bought += 1
         time.sleep(0.3)
