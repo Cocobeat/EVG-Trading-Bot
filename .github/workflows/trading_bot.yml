@@ -18,6 +18,11 @@ permissions:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    # Senza un tetto, un run bloccato (es. una chiamata Kraken che non
+    # risponde mai) resta appeso e occupa il concurrency group sopra per
+    # ore: nessun run successivo puo' partire, quindi nessuno controlla
+    # SL/TP/trailing sulle posizioni aperte per tutto quel tempo.
+    timeout-minutes: 8
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -42,6 +47,7 @@ jobs:
         run: python bot.py
 
       - name: Commit updated state
+        if: always()
         run: |
           git config user.name "trading-bot"
           git config user.email "trading-bot@users.noreply.github.com"
