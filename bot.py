@@ -700,7 +700,9 @@ def get_ohlc(pair, interval=None, lookback=None):
     return {
         "closes": [float(c[4]) for c in candles][-n:],
         "opens": [float(c[1]) for c in candles][-n:],
+        "highs": [float(c[2]) for c in candles][-n:],
         "volumes": [float(c[6]) for c in candles][-n:],
+        "times": [int(c[0]) for c in candles][-n:],
     }
 
 
@@ -961,6 +963,31 @@ def check_sells(positions, tickers, state, params, balances):
         chg = (price - entry) / entry * 100
 
         pos["highest_price"] = max(pos.get("highest_price", entry), price)
+
+        # Il bot legge il ticker solo agli istanti in cui gira (ogni ~1min).
+        # Su coin poco liquide uno spike puo' salire e ricrollare tutto tra
+        # un poll e l'altro: il trailing basato solo sul ticker non lo vede
+        # mai e non protegge nulla di quel guadagno. Le candele OHLC invece
+        # registrano il vero massimo (high) di ogni intervallo, indipendente
+        # da quando il bot ha interrogato l'API. Guardiamo solo le candele
+        # dall'apertura della posizione in poi, per non "vedere" un picco
+        # di prima dell'acquisto e armare il trailing su un guadagno mai
+        # avuto davvero.
+        hold = minutes_held(pos)
+        try:
+            lookback = min(288, max(20, int(hold / CONFIG["SCAN_TIMEFRAME"]) + 6))
+            ohlc = get_ohlc(pos["pair"], CONFIG["SCAN_TIMEFRAME"], lookback)
+            entry_epoch = datetime.fromisoformat(pos["entry_time"]).timestamp()
+            candle_highs = [
+                h for t, h in zip(ohlc["times"], ohlc["highs"]) if t >= entry_epoch
+            ]
+            if candle_highs:
+                pos["highest_price"] = max(pos["highest_price"], max(candle_highs))
+        except RateLimitError as e:
+            print(f"[RATE LIMIT] {e} — uso solo il ticker per {base} questo run")
+        except Exception as e:
+            print(f"[WARN] OHLC picco reale {base}: {e}")
+
         peak = pos["highest_price"]
 
         sl_price = pos.get("sl_price", entry * (1 - pos.get("sl_pct", params["sl_pct"]) / 100))
