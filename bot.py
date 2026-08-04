@@ -969,7 +969,6 @@ def scan_pumping(all_pairs, tickers, params, state):
         pumping.append({
             "pair": pair_name, "base": base, "asset_code": info.get("asset_code"),
             "ordermin": info["ordermin"], "lot_decimals": info["lot_decimals"],
-            "pair_decimals": info.get("pair_decimals", 8),
             "last_price": last_price, "change_today_pct": chg,
             "vol_eur": vol_eur, "spread_pct": spread,
         })
@@ -1094,34 +1093,27 @@ def check_sells(positions, tickers, state, params, balances):
             is_loss = True
 
         if not reason:
-            # Non vendiamo questo run. Due casi in cui tocca lo stop reale
-            # sul server Kraken: (1) manca del tutto (es. un piazzamento
-            # fallito al momento dell'acquisto, come NPC con l'errore sui
-            # decimali — senza questo ripescaggio resterebbe scoperta finche'
-            # non arma il trailing, anche per giorni); (2) il trailing ha
-            # alzato lo stop effettivo in modo apprezzabile e va allineato.
-            if trading_enabled() and not CONFIG["KRAKEN_DRY_RUN"]:
-                if peak_gain >= t_arm:
-                    trail_stop_price = peak * (1 - t_dist / 100)
-                    breakeven_price = entry * (1 + CONFIG["BREAKEVEN_BUFFER_PCT"] / 100)
-                    desired_stop = max(trail_stop_price, breakeven_price)
-                else:
-                    desired_stop = sl_price
-                old_txid = pos.get("server_sl_txid")
+            # Non vendiamo questo run: se il trailing ha alzato lo stop
+            # effettivo in modo apprezzabile, aggiorniamo anche lo stop
+            # reale sul server Kraken (cancella e ripiazza), cosi' la
+            # protezione offline segue il trailing e non resta ferma al
+            # livello di ingresso.
+            if trading_enabled() and not CONFIG["KRAKEN_DRY_RUN"] and peak_gain >= t_arm:
+                trail_stop_price = peak * (1 - t_dist / 100)
+                breakeven_price = entry * (1 + CONFIG["BREAKEVEN_BUFFER_PCT"] / 100)
+                new_stop = max(trail_stop_price, breakeven_price)
                 old_stop = pos.get("server_sl_price")
-                needs_update = old_txid is None or (
-                    old_stop is not None and desired_stop > old_stop * 1.003
-                )
-                if needs_update:
+                if old_stop is None or new_stop > old_stop * 1.003:
+                    old_txid = pos.get("server_sl_txid")
                     if old_txid:
                         cancel_order(old_txid)
                     try:
-                        r = place_stop_order(pos["pair"], pos["volume"], desired_stop,
+                        r = place_stop_order(pos["pair"], pos["volume"], new_stop,
                                               pos.get("pair_decimals", 8))
                         pos["server_sl_txid"] = r.get("txid", [None])[0]
-                        pos["server_sl_price"] = desired_stop
+                        pos["server_sl_price"] = new_stop
                     except Exception as e:
-                        print(f"[WARN] Piazzamento/aggiornamento stop server {base}: {e}")
+                        print(f"[WARN] Aggiornamento stop server {base}: {e}")
             continue
 
         sell_vol = pos["volume"]
