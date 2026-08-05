@@ -7,7 +7,7 @@
       "volume": 2061.29749,
       "entry_time": "2026-08-05T17:25:45.496638+00:00",
       "highest_price": 0.007914,
-      "last_price": 0.007836,
+      "last_price": 0.007944,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
       "tp_price": 0.026907599999999997,
@@ -34,7 +34,9 @@
       "server_sl_price": 0.0069643199999999995,
       "pair_decimals": 6,
       "lot_decimals": 5,
-      "entry_fee_eur": 0.1305
+      "entry_fee_eur": 0.1305,
+      "server_tp_txid": "OOSBNN-6FD2I-ZXU3TL",
+      "server_tp_price": 0.026907599999999997
     },
     "AI": {
       "pair": "AIEUR",
@@ -75,15 +77,15 @@
   },
   "last_heartbeat_date": "2026-08-05",
   "cumulative_pnl_eur": -1.1600605909099961,
-  "trading_paused": true,
-  "telegram_update_offset": 64929860,
+  "trading_paused": false,
+  "telegram_update_offset": 64929861,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {
-    "PRCL": 29.549905633333328
+    "PRCL": 28.268833083333327
   },
-  "last_run_time": "2026-08-05T17:59:50.116551+00:00",
+  "last_run_time": "2026-08-05T18:01:06.980904+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
