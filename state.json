@@ -66,8 +66,8 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump",
-      "server_sl_txid": "OGPFJH-N6J6F-4TAYRA",
-      "server_sl_price": 0.006014639999999999,
+      "server_sl_txid": "OUUTXW-44HC3-DWRAN2",
+      "server_sl_price": 0.0069643199999999995,
       "pair_decimals": 6,
       "lot_decimals": 5,
       "entry_fee_eur": 0.1305
@@ -81,9 +81,9 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {
-    "PRCL": 54.74269968333333
+    "PRCL": 53.54478004999999
   },
-  "last_run_time": "2026-08-05T17:34:38.548908+00:00",
+  "last_run_time": "2026-08-05T17:35:50.424086+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
