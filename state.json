@@ -44,10 +44,8 @@
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
   "user_profile": "aggressivo",
-  "cooldowns": {
-    "PRCL": 0.7348837499999945
-  },
-  "last_run_time": "2026-08-05T18:28:39.017864+00:00",
+  "cooldowns": {},
+  "last_run_time": "2026-08-05T18:29:24.458878+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
