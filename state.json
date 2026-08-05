@@ -7,7 +7,7 @@
       "volume": 3057.3438,
       "entry_time": "2026-08-05T17:22:52.403099+00:00",
       "highest_price": 0.00566,
-      "last_price": 0.00566,
+      "last_price": 0.00549,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
       "tp_price": 0.018768,
@@ -35,6 +35,42 @@
       "pair_decimals": 5,
       "lot_decimals": 5,
       "entry_fee_eur": 0.13522826
+    },
+    "INX": {
+      "pair": "INXEUR",
+      "asset_code": "INX",
+      "entry_price": 0.007914,
+      "volume": 2061.29749,
+      "entry_time": "2026-08-05T17:25:45.496638+00:00",
+      "highest_price": 0.007914,
+      "last_price": 0.007914,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.026907599999999997,
+      "sl_price": 0.0069643199999999995,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "pump",
+      "server_sl_txid": null,
+      "server_sl_price": null,
+      "pair_decimals": 6,
+      "lot_decimals": 5,
+      "entry_fee_eur": 0.1305
     }
   },
   "last_heartbeat_date": "2026-08-05",
@@ -45,7 +81,7 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-05T17:24:28.356396+00:00",
+  "last_run_time": "2026-08-05T17:25:36.008004+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 1,
