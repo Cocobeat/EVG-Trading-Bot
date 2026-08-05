@@ -1,44 +1,5 @@
 {
   "open_positions": {
-    "INX": {
-      "pair": "INXEUR",
-      "asset_code": "INX",
-      "entry_price": 0.007914,
-      "volume": 2061.29749,
-      "entry_time": "2026-08-05T17:25:45.496638+00:00",
-      "highest_price": 0.007914,
-      "last_price": 0.007929,
-      "tp_pct": 2.7,
-      "sl_pct": 12.0,
-      "tp_price": 0.008127678,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "dip_scalp",
-      "server_sl_txid": null,
-      "server_sl_price": null,
-      "pair_decimals": 6,
-      "lot_decimals": 5,
-      "entry_fee_eur": 0.1305,
-      "server_tp_txid": "OGZOX4-I7LUB-IU3CUT",
-      "server_tp_price": 0.026907599999999997,
-      "catastrophic_pct": 32.0,
-      "catastrophic_price": 0.005381519999999999
-    },
     "AI": {
       "pair": "AIEUR",
       "asset_code": "AI",
@@ -77,6 +38,45 @@
       "server_tp_price": 0.066776,
       "catastrophic_pct": 32.0,
       "catastrophic_price": 0.0133552
+    },
+    "INX": {
+      "pair": "INXEUR",
+      "asset_code": "INX",
+      "entry_price": 0.007914,
+      "volume": 2061.29749,
+      "entry_time": "2026-08-05T17:25:45.496638+00:00",
+      "highest_price": 0.007914,
+      "last_price": 0.007929,
+      "tp_pct": 2.7,
+      "sl_pct": 12.0,
+      "tp_price": 0.008127678,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "dip_scalp",
+      "server_sl_txid": null,
+      "server_sl_price": null,
+      "pair_decimals": 6,
+      "lot_decimals": 5,
+      "entry_fee_eur": 0.1305,
+      "server_tp_txid": "OGZOX4-I7LUB-IU3CUT",
+      "server_tp_price": 0.026907599999999997,
+      "catastrophic_pct": 32.0,
+      "catastrophic_price": 0.005381519999999999
     }
   },
   "last_heartbeat_date": "2026-08-05",
@@ -87,9 +87,9 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {
-    "PRCL": 21.98078376666666
+    "PRCL": 21.626850399999995
   },
-  "last_run_time": "2026-08-05T18:07:24.263863+00:00",
+  "last_run_time": "2026-08-05T18:07:45.499865+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
