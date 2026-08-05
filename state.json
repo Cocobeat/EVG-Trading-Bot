@@ -1,39 +1,5 @@
 {
   "open_positions": {
-    "TAO": {
-      "pair": "TAOEUR",
-      "asset_code": "TAO",
-      "entry_price": 173.647,
-      "volume": 0.09693,
-      "entry_time": "2026-08-04T20:11:01.878437+00:00",
-      "highest_price": 173.647,
-      "last_price": 169.5142,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 590.3997999999999,
-      "sl_price": 152.80936,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": "O27FVB-RBE2L-ROQSKE",
-      "server_sl_price": 152.80936,
-      "pair_decimals": 4
-    },
     "ZIG": {
       "pair": "ZIGEUR",
       "asset_code": "ZIG",
@@ -67,6 +33,40 @@
       "server_sl_txid": "OFOGW2-BUMFV-CQZ5RD",
       "server_sl_price": 0.031653600000000004,
       "pair_decimals": 5
+    },
+    "TAO": {
+      "pair": "TAOEUR",
+      "asset_code": "TAO",
+      "entry_price": 173.647,
+      "volume": 0.09693,
+      "entry_time": "2026-08-04T20:11:01.878437+00:00",
+      "highest_price": 173.647,
+      "last_price": 169.5142,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 590.3997999999999,
+      "sl_price": 152.80936,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "pump",
+      "server_sl_txid": "O27FVB-RBE2L-ROQSKE",
+      "server_sl_price": 152.80936,
+      "pair_decimals": 4
     },
     "PUMP": {
       "pair": "PUMPEUR",
@@ -111,7 +111,7 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-05T01:15:47.962884+00:00",
+  "last_run_time": "2026-08-05T01:16:14.269720+00:00",
   "trade_stats": {
     "auto_wins": 0,
     "auto_losses": 0,
