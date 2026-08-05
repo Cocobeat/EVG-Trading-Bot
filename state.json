@@ -8,10 +8,9 @@
       "entry_time": "2026-08-05T17:25:45.496638+00:00",
       "highest_price": 0.007914,
       "last_price": 0.007929,
-      "tp_pct": 240.0,
+      "tp_pct": 2.7,
       "sl_pct": 12.0,
-      "tp_price": 0.026907599999999997,
-      "sl_price": 0.0069643199999999995,
+      "tp_price": 0.008127678,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -29,14 +28,16 @@
         ]
       ],
       "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": "OUUTXW-44HC3-DWRAN2",
-      "server_sl_price": 0.0069643199999999995,
+      "strategy": "dip_scalp",
+      "server_sl_txid": null,
+      "server_sl_price": null,
       "pair_decimals": 6,
       "lot_decimals": 5,
       "entry_fee_eur": 0.1305,
       "server_tp_txid": "OGZOX4-I7LUB-IU3CUT",
-      "server_tp_price": 0.026907599999999997
+      "server_tp_price": 0.026907599999999997,
+      "catastrophic_pct": 32.0,
+      "catastrophic_price": 0.005381519999999999
     },
     "AI": {
       "pair": "AIEUR",
@@ -46,10 +47,9 @@
       "entry_time": "2026-08-05T17:31:33.585539+00:00",
       "highest_price": 0.01964,
       "last_price": 0.01931,
-      "tp_pct": 240.0,
+      "tp_pct": 2.7,
       "sl_pct": 12.0,
-      "tp_price": 0.066776,
-      "sl_price": 0.017283200000000002,
+      "tp_price": 0.02017028,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -67,14 +67,16 @@
         ]
       ],
       "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": "OKQGUA-5CEME-S2PQF7",
-      "server_sl_price": 0.017283200000000002,
+      "strategy": "dip_scalp",
+      "server_sl_txid": null,
+      "server_sl_price": null,
       "pair_decimals": 5,
       "lot_decimals": 5,
       "entry_fee_eur": 0.13158,
       "server_tp_txid": "OKSMU3-GQ2EI-MWG6K5",
-      "server_tp_price": 0.066776
+      "server_tp_price": 0.066776,
+      "catastrophic_pct": 32.0,
+      "catastrophic_price": 0.0133552
     }
   },
   "last_heartbeat_date": "2026-08-05",
@@ -85,9 +87,9 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {
-    "PRCL": 23.82700368333333
+    "PRCL": 22.819428749999997
   },
-  "last_run_time": "2026-08-05T18:05:33.490668+00:00",
+  "last_run_time": "2026-08-05T18:06:33.945164+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
