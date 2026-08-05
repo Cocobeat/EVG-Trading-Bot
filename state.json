@@ -7,7 +7,7 @@
       "volume": 0.09693,
       "entry_time": "2026-08-04T20:11:01.878437+00:00",
       "highest_price": 173.647,
-      "last_price": 171.173,
+      "last_price": 171.1741,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
       "tp_price": 590.3997999999999,
@@ -43,7 +43,7 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-05T17:08:29.823311+00:00",
+  "last_run_time": "2026-08-05T17:09:21.840455+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 1,
