@@ -1,39 +1,5 @@
 {
   "open_positions": {
-    "ZIG": {
-      "pair": "ZIGEUR",
-      "asset_code": "ZIG",
-      "entry_price": 0.03597,
-      "volume": 470.58177,
-      "entry_time": "2026-08-04T19:54:52.200202+00:00",
-      "highest_price": 0.03616,
-      "last_price": 0.03456,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.122298,
-      "sl_price": 0.031653600000000004,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": "OFOGW2-BUMFV-CQZ5RD",
-      "server_sl_price": 0.031653600000000004,
-      "pair_decimals": 5
-    },
     "PUMP": {
       "pair": "PUMPEUR",
       "asset_code": "PUMP",
@@ -75,7 +41,7 @@
       "volume": 0.09693,
       "entry_time": "2026-08-04T20:11:01.878437+00:00",
       "highest_price": 173.647,
-      "last_price": 169.771,
+      "last_price": 169.2697,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
       "tp_price": 590.3997999999999,
@@ -104,18 +70,18 @@
     }
   },
   "last_heartbeat_date": "2026-08-05",
-  "cumulative_pnl_eur": 0.02743412679000401,
+  "cumulative_pnl_eur": -0.7302025229099961,
   "trading_paused": true,
   "telegram_update_offset": 64929855,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-05T12:02:26.439516+00:00",
+  "last_run_time": "2026-08-05T12:03:20.893290+00:00",
   "trade_stats": {
     "auto_wins": 0,
-    "auto_losses": 0,
-    "auto_pnl": 0.0,
+    "auto_losses": 1,
+    "auto_pnl": -0.7576366497000001,
     "manual_count": 3,
     "manual_pnl": 0.02743412679000401
   },
