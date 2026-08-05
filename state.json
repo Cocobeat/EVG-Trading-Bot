@@ -30,8 +30,8 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump",
-      "server_sl_txid": "OOHGSG-F2ONO-KZT2O3",
-      "server_sl_price": 0.014926400000000001,
+      "server_sl_txid": "OKQGUA-5CEME-S2PQF7",
+      "server_sl_price": 0.017283200000000002,
       "pair_decimals": 5,
       "lot_decimals": 5,
       "entry_fee_eur": 0.13158
@@ -81,9 +81,9 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {
-    "PRCL": 47.97373938333333
+    "PRCL": 46.824222266666666
   },
-  "last_run_time": "2026-08-05T17:41:24.686526+00:00",
+  "last_run_time": "2026-08-05T17:42:33.657553+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
