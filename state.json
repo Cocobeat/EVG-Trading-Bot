@@ -1,17 +1,17 @@
 {
   "open_positions": {
-    "PUMP": {
-      "pair": "PUMPEUR",
-      "asset_code": "PUMP",
-      "entry_price": 0.002124,
-      "volume": 7937.50941,
-      "entry_time": "2026-08-04T20:05:19.160683+00:00",
-      "highest_price": 0.002212,
-      "last_price": 0.002168,
+    "TAO": {
+      "pair": "TAOEUR",
+      "asset_code": "TAO",
+      "entry_price": 173.647,
+      "volume": 0.09693,
+      "entry_time": "2026-08-04T20:11:01.878437+00:00",
+      "highest_price": 173.647,
+      "last_price": 170.8451,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.0072216,
-      "sl_price": 0.00186912,
+      "tp_price": 590.3997999999999,
+      "sl_price": 152.80936,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -30,9 +30,9 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump",
-      "server_sl_txid": null,
-      "server_sl_price": null,
-      "pair_decimals": 6
+      "server_sl_txid": "O27FVB-RBE2L-ROQSKE",
+      "server_sl_price": 152.80936,
+      "pair_decimals": 4
     },
     "ZIG": {
       "pair": "ZIGEUR",
@@ -68,18 +68,18 @@
       "server_sl_price": 0.031653600000000004,
       "pair_decimals": 5
     },
-    "TAO": {
-      "pair": "TAOEUR",
-      "asset_code": "TAO",
-      "entry_price": 173.647,
-      "volume": 0.09693,
-      "entry_time": "2026-08-04T20:11:01.878437+00:00",
-      "highest_price": 173.647,
-      "last_price": 170.8451,
+    "PUMP": {
+      "pair": "PUMPEUR",
+      "asset_code": "PUMP",
+      "entry_price": 0.002124,
+      "volume": 7937.50941,
+      "entry_time": "2026-08-04T20:05:19.160683+00:00",
+      "highest_price": 0.002212,
+      "last_price": 0.002168,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 590.3997999999999,
-      "sl_price": 152.80936,
+      "tp_price": 0.0072216,
+      "sl_price": 0.00186912,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -98,9 +98,9 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump",
-      "server_sl_txid": "O27FVB-RBE2L-ROQSKE",
-      "server_sl_price": 152.80936,
-      "pair_decimals": 4
+      "server_sl_txid": null,
+      "server_sl_price": null,
+      "pair_decimals": 6
     }
   },
   "last_heartbeat_date": "2026-08-05",
@@ -111,7 +111,7 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-05T08:01:09.852157+00:00",
+  "last_run_time": "2026-08-05T08:01:25.315659+00:00",
   "trade_stats": {
     "auto_wins": 0,
     "auto_losses": 0,
