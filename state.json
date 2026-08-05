@@ -75,15 +75,15 @@
   },
   "last_heartbeat_date": "2026-08-05",
   "cumulative_pnl_eur": -1.1600605909099961,
-  "trading_paused": false,
-  "telegram_update_offset": 64929858,
+  "trading_paused": true,
+  "telegram_update_offset": 64929860,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {
-    "PRCL": 56.627978150000004
+    "PRCL": 55.85253706666666
   },
-  "last_run_time": "2026-08-05T17:32:45.432200+00:00",
+  "last_run_time": "2026-08-05T17:33:31.958665+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
