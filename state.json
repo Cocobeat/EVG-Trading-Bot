@@ -1,95 +1,16 @@
 {
-  "open_positions": {
-    "AI": {
-      "pair": "AIEUR",
-      "asset_code": "AI",
-      "entry_price": 0.01964,
-      "volume": 837.03168,
-      "entry_time": "2026-08-05T17:31:33.585539+00:00",
-      "highest_price": 0.01964,
-      "last_price": 0.01931,
-      "tp_pct": 2.7,
-      "sl_pct": 12.0,
-      "tp_price": 0.02017028,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "dip_scalp",
-      "server_sl_txid": null,
-      "server_sl_price": null,
-      "pair_decimals": 5,
-      "lot_decimals": 5,
-      "entry_fee_eur": 0.13158,
-      "server_tp_txid": "OKSMU3-GQ2EI-MWG6K5",
-      "server_tp_price": 0.066776,
-      "catastrophic_pct": 32.0,
-      "catastrophic_price": 0.0133552
-    },
-    "INX": {
-      "pair": "INXEUR",
-      "asset_code": "INX",
-      "entry_price": 0.007914,
-      "volume": 2061.29749,
-      "entry_time": "2026-08-05T17:25:45.496638+00:00",
-      "highest_price": 0.007914,
-      "last_price": 0.007898,
-      "tp_pct": 2.7,
-      "sl_pct": 12.0,
-      "tp_price": 0.008127678,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "dip_scalp",
-      "server_sl_txid": null,
-      "server_sl_price": null,
-      "pair_decimals": 6,
-      "lot_decimals": 5,
-      "entry_fee_eur": 0.1305,
-      "server_tp_txid": "OGZOX4-I7LUB-IU3CUT",
-      "server_tp_price": 0.026907599999999997,
-      "catastrophic_pct": 32.0,
-      "catastrophic_price": 0.005381519999999999
-    }
-  },
+  "open_positions": {},
   "last_heartbeat_date": "2026-08-05",
   "cumulative_pnl_eur": -1.1600605909099961,
-  "trading_paused": false,
-  "telegram_update_offset": 64929862,
+  "trading_paused": true,
+  "telegram_update_offset": 64929863,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {
-    "PRCL": 11.994065083333327
+    "PRCL": 10.942926149999993
   },
-  "last_run_time": "2026-08-05T18:17:23.466984+00:00",
+  "last_run_time": "2026-08-05T18:18:26.535320+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
