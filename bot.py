@@ -663,15 +663,32 @@ def force_close_one(state, base, balances=_UNSET):
         # stessa coin, quello stop vecchio potrebbe vendere la posizione
         # nuova a un prezzo calcolato sulla vecchia entry.
         server_txid = pos.get("server_sl_txid")
+        cancel_ok = True
         if server_txid:
-            cancel_order(server_txid)
-            pos["server_sl_txid"] = None
-            pos["server_sl_price"] = None
-            # Il saldo che lo stop teneva vincolato non si libera sempre
-            # nello stesso istante in cui la cancellazione viene accettata:
-            # una vendita immediata sullo stesso volume puo' trovare ancora
-            # "occupato" quello che stiamo per rivendicare.
-            time.sleep(1.5)
+            # cancel_order() puo' fallire senza sollevare eccezione (la
+            # cattura lei stessa e ritorna False) — se non controlliamo il
+            # risultato e cancelliamo comunque server_sl_txid dallo stato,
+            # lo stop reale resta vivo su Kraken (e continua a tenere
+            # vincolato tutto il saldo) mentre noi crediamo che non ci sia
+            # piu' nulla: la vendita fallisce sempre per fondi insufficienti
+            # e lo stato non racconta piu' quello che e' vero sul server.
+            cancel_ok = cancel_order(server_txid)
+            if cancel_ok:
+                pos["server_sl_txid"] = None
+                pos["server_sl_price"] = None
+                # Il saldo che lo stop teneva vincolato non si libera sempre
+                # nello stesso istante in cui la cancellazione viene
+                # accettata: una vendita immediata sullo stesso volume puo'
+                # trovare ancora "occupato" quello che stiamo per rivendicare.
+                time.sleep(1.5)
+        if not cancel_ok:
+            telegram_send(
+                f"⚠️ {base}: impossibile cancellare lo stop reale esistente "
+                f"({server_txid}) — non tento la vendita, il saldo resta "
+                f"vincolato li'. Lo stop e' comunque ancora attivo e protegge "
+                f"la posizione. Riprovo la cancellazione al prossimo run."
+            )
+            return
         try:
             result, sell_vol = sell_with_balance_retry(
                 pos["pair"], asset_code, sell_vol, pos.get("lot_decimals", 8)
@@ -680,8 +697,9 @@ def force_close_one(state, base, balances=_UNSET):
             order_note = f"\nOrdine: {txid} ({mode_label()})"
         except Exception as e:
             telegram_send(f"⚠️ Errore vendita {base}: {e}")
-            # Stop gia' cancellato sopra: ripiazza subito qualcosa invece
-            # di lasciare la posizione scoperta.
+            # A questo punto lo stop era stato davvero cancellato (altrimenti
+            # saremmo usciti sopra), quindi la posizione e' scoperta per
+            # davvero: ripiazza subito qualcosa invece di lasciarla cosi'.
             try:
                 fallback_sl = pos.get("sl_price", pos["entry_price"] * 0.9)
                 emerg_vol = round_vol(pos["volume"] * 0.99, pos.get("lot_decimals", 8))
@@ -1413,14 +1431,30 @@ def check_sells(positions, tickers, state, params, balances):
             # (il nostro market e lo stop sul server), rischio di vendere
             # due volte o che il secondo ordine fallisca a vuoto.
             server_txid = pos.get("server_sl_txid")
+            cancel_ok = True
             if server_txid:
-                cancel_order(server_txid)
-                pos["server_sl_txid"] = None
-                pos["server_sl_price"] = None
-                # Vedi sell_with_balance_retry/force_close_one: il saldo
-                # vincolato dallo stop appena cancellato non si libera
-                # sempre nello stesso istante.
-                time.sleep(1.5)
+                # cancel_order() puo' fallire senza sollevare eccezione: se
+                # non controlliamo il risultato e cancelliamo comunque
+                # server_sl_txid dallo stato, lo stop reale resta vivo su
+                # Kraken (e tiene vincolato tutto il saldo) mentre crediamo
+                # non ci sia piu' nulla — la vendita fallisce sempre per
+                # fondi insufficienti e lo stato mente su cosa c'e' davvero.
+                cancel_ok = cancel_order(server_txid)
+                if cancel_ok:
+                    pos["server_sl_txid"] = None
+                    pos["server_sl_price"] = None
+                    # Vedi sell_with_balance_retry/force_close_one: il saldo
+                    # vincolato dallo stop appena cancellato non si libera
+                    # sempre nello stesso istante.
+                    time.sleep(1.5)
+            if not cancel_ok:
+                telegram_send(
+                    f"⚠️ {base}: impossibile cancellare lo stop reale esistente "
+                    f"({server_txid}) — non tento la vendita, il saldo resta "
+                    f"vincolato li'. Lo stop e' comunque ancora attivo e "
+                    f"protegge la posizione. Riprovo al prossimo run."
+                )
+                continue
             try:
                 result, sell_vol = sell_with_balance_retry(
                     pos["pair"], asset_code, sell_vol, pos.get("lot_decimals", 8)
@@ -1429,10 +1463,9 @@ def check_sells(positions, tickers, state, params, balances):
                 order_note = f"\nOrdine: {txid}"
             except Exception as e:
                 telegram_send(f"⚠️ Errore vendita {base}: {e}")
-                # Lo stop reale e' gia' stato cancellato sopra: la posizione
-                # e' scoperta finche' non ripiazziamo qualcosa adesso,
-                # invece di lasciarla nuda fino al prossimo run (che
-                # ripeterebbe comunque lo stesso fallimento).
+                # A questo punto lo stop era stato davvero cancellato
+                # (altrimenti saremmo usciti sopra): la posizione e'
+                # scoperta per davvero, ripiazza subito qualcosa.
                 try:
                     emerg_vol = round_vol(pos["volume"] * 0.99, pos.get("lot_decimals", 8))
                     r2, dec2 = place_stop_order_safe(
