@@ -1,40 +1,5 @@
 {
-  "open_positions": {
-    "TAO": {
-      "pair": "TAOEUR",
-      "asset_code": "TAO",
-      "entry_price": 173.647,
-      "volume": 0.09693,
-      "entry_time": "2026-08-04T20:11:01.878437+00:00",
-      "highest_price": 173.647,
-      "last_price": 171.0579,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 590.3997999999999,
-      "sl_price": 152.80936,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": "O27FVB-RBE2L-ROQSKE",
-      "server_sl_price": 152.80936,
-      "pair_decimals": 4
-    }
-  },
+  "open_positions": {},
   "last_heartbeat_date": "2026-08-05",
   "cumulative_pnl_eur": -0.7076023429099957,
   "trading_paused": true,
@@ -43,7 +8,7 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-05T17:13:25.666553+00:00",
+  "last_run_time": "2026-08-05T17:14:36.507330+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 1,
