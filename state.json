@@ -1,39 +1,5 @@
 {
   "open_positions": {
-    "PUMP": {
-      "pair": "PUMPEUR",
-      "asset_code": "PUMP",
-      "entry_price": 0.002124,
-      "volume": 7937.50941,
-      "entry_time": "2026-08-04T20:05:19.160683+00:00",
-      "highest_price": 0.002252,
-      "last_price": 0.002143,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.0072216,
-      "sl_price": 0.00186912,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": null,
-      "server_sl_price": null,
-      "pair_decimals": 6
-    },
     "TAO": {
       "pair": "TAOEUR",
       "asset_code": "TAO",
@@ -70,18 +36,18 @@
     }
   },
   "last_heartbeat_date": "2026-08-05",
-  "cumulative_pnl_eur": -0.7302025229099961,
+  "cumulative_pnl_eur": -0.7076023429099957,
   "trading_paused": true,
   "telegram_update_offset": 64929855,
   "current_regime": "BEAR_DEFENSIVE",
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-05T16:53:28.521313+00:00",
+  "last_run_time": "2026-08-05T16:54:27.551426+00:00",
   "trade_stats": {
-    "auto_wins": 0,
+    "auto_wins": 1,
     "auto_losses": 1,
-    "auto_pnl": -0.7576366497000001,
+    "auto_pnl": -0.7350364696999997,
     "manual_count": 3,
     "manual_pnl": 0.02743412679000401
   },
