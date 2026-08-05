@@ -1,41 +1,5 @@
 {
   "open_positions": {
-    "AI": {
-      "pair": "AIEUR",
-      "asset_code": "AI",
-      "entry_price": 0.01964,
-      "volume": 837.03168,
-      "entry_time": "2026-08-05T17:31:33.585539+00:00",
-      "highest_price": 0.01964,
-      "last_price": 0.01931,
-      "tp_pct": 240.0,
-      "sl_pct": 12.0,
-      "tp_price": 0.066776,
-      "sl_price": 0.017283200000000002,
-      "trail_arm": 4.0,
-      "trail_dist": 3.0,
-      "trail_tiers": [
-        [
-          0,
-          3.0
-        ],
-        [
-          8,
-          8.0
-        ],
-        [
-          20,
-          12.0
-        ]
-      ],
-      "min_hold_min": 10,
-      "strategy": "pump",
-      "server_sl_txid": "OKQGUA-5CEME-S2PQF7",
-      "server_sl_price": 0.017283200000000002,
-      "pair_decimals": 5,
-      "lot_decimals": 5,
-      "entry_fee_eur": 0.13158
-    },
     "INX": {
       "pair": "INXEUR",
       "asset_code": "INX",
@@ -71,6 +35,42 @@
       "pair_decimals": 6,
       "lot_decimals": 5,
       "entry_fee_eur": 0.1305
+    },
+    "AI": {
+      "pair": "AIEUR",
+      "asset_code": "AI",
+      "entry_price": 0.01964,
+      "volume": 837.03168,
+      "entry_time": "2026-08-05T17:31:33.585539+00:00",
+      "highest_price": 0.01964,
+      "last_price": 0.01931,
+      "tp_pct": 240.0,
+      "sl_pct": 12.0,
+      "tp_price": 0.066776,
+      "sl_price": 0.017283200000000002,
+      "trail_arm": 4.0,
+      "trail_dist": 3.0,
+      "trail_tiers": [
+        [
+          0,
+          3.0
+        ],
+        [
+          8,
+          8.0
+        ],
+        [
+          20,
+          12.0
+        ]
+      ],
+      "min_hold_min": 10,
+      "strategy": "pump",
+      "server_sl_txid": "OKQGUA-5CEME-S2PQF7",
+      "server_sl_price": 0.017283200000000002,
+      "pair_decimals": 5,
+      "lot_decimals": 5,
+      "entry_fee_eur": 0.13158
     }
   },
   "last_heartbeat_date": "2026-08-05",
@@ -81,9 +81,9 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {
-    "PRCL": 30.038938533333326
+    "PRCL": 29.549905633333328
   },
-  "last_run_time": "2026-08-05T17:59:20.774577+00:00",
+  "last_run_time": "2026-08-05T17:59:50.116551+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
