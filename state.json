@@ -1,17 +1,17 @@
 {
   "open_positions": {
-    "PUMP": {
-      "pair": "PUMPEUR",
-      "asset_code": "PUMP",
-      "entry_price": 0.002124,
-      "volume": 7937.50941,
-      "entry_time": "2026-08-04T20:05:19.160683+00:00",
-      "highest_price": 0.002212,
-      "last_price": 0.002113,
+    "ZIG": {
+      "pair": "ZIGEUR",
+      "asset_code": "ZIG",
+      "entry_price": 0.03597,
+      "volume": 470.58177,
+      "entry_time": "2026-08-04T19:54:52.200202+00:00",
+      "highest_price": 0.03616,
+      "last_price": 0.03518,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.0072216,
-      "sl_price": 0.00186912,
+      "tp_price": 0.122298,
+      "sl_price": 0.031653600000000004,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -30,9 +30,9 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump",
-      "server_sl_txid": null,
-      "server_sl_price": null,
-      "pair_decimals": 6
+      "server_sl_txid": "OFOGW2-BUMFV-CQZ5RD",
+      "server_sl_price": 0.031653600000000004,
+      "pair_decimals": 5
     },
     "TAO": {
       "pair": "TAOEUR",
@@ -68,18 +68,18 @@
       "server_sl_price": 152.80936,
       "pair_decimals": 4
     },
-    "ZIG": {
-      "pair": "ZIGEUR",
-      "asset_code": "ZIG",
-      "entry_price": 0.03597,
-      "volume": 470.58177,
-      "entry_time": "2026-08-04T19:54:52.200202+00:00",
-      "highest_price": 0.03616,
-      "last_price": 0.03518,
+    "PUMP": {
+      "pair": "PUMPEUR",
+      "asset_code": "PUMP",
+      "entry_price": 0.002124,
+      "volume": 7937.50941,
+      "entry_time": "2026-08-04T20:05:19.160683+00:00",
+      "highest_price": 0.002212,
+      "last_price": 0.002112,
       "tp_pct": 240.0,
       "sl_pct": 12.0,
-      "tp_price": 0.122298,
-      "sl_price": 0.031653600000000004,
+      "tp_price": 0.0072216,
+      "sl_price": 0.00186912,
       "trail_arm": 4.0,
       "trail_dist": 3.0,
       "trail_tiers": [
@@ -98,9 +98,9 @@
       ],
       "min_hold_min": 10,
       "strategy": "pump",
-      "server_sl_txid": "OFOGW2-BUMFV-CQZ5RD",
-      "server_sl_price": 0.031653600000000004,
-      "pair_decimals": 5
+      "server_sl_txid": null,
+      "server_sl_price": null,
+      "pair_decimals": 6
     }
   },
   "last_heartbeat_date": "2026-08-05",
@@ -111,7 +111,7 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-05T00:01:11.155343+00:00",
+  "last_run_time": "2026-08-05T00:01:25.858700+00:00",
   "trade_stats": {
     "auto_wins": 0,
     "auto_losses": 0,
