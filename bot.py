@@ -647,8 +647,17 @@ def force_close_one(state, base, balances=_UNSET):
                     f"(probabilmente gia' venduta manualmente)."
                 )
                 server_txid = pos.get("server_sl_txid")
-                if server_txid:
-                    cancel_order(server_txid)
+                if server_txid and cancel_order(server_txid) == CANCEL_FAILED:
+                    # Il saldo e' comunque quasi a zero (per questo siamo
+                    # in questo ramo): la posizione va rimossa dal
+                    # tracciamento a prescindere, ma se la cancellazione
+                    # e' fallita per un motivo transitorio (non "gia'
+                    # sparito") lo stop potrebbe restare vivo e orfano.
+                    telegram_send(
+                        f"⚠️ {base}: rimosso dal tracciamento ma la cancellazione "
+                        f"dello stop reale ({server_txid}) potrebbe non essere "
+                        f"andata a buon fine — verifica manualmente su Kraken."
+                    )
                 del positions[base]
                 return
             sell_vol = min(sell_vol, real_bal)
@@ -663,30 +672,32 @@ def force_close_one(state, base, balances=_UNSET):
         # stessa coin, quello stop vecchio potrebbe vendere la posizione
         # nuova a un prezzo calcolato sulla vecchia entry.
         server_txid = pos.get("server_sl_txid")
-        cancel_ok = True
+        cancel_status = CANCEL_OK
         if server_txid:
-            # cancel_order() puo' fallire senza sollevare eccezione (la
-            # cattura lei stessa e ritorna False) — se non controlliamo il
-            # risultato e cancelliamo comunque server_sl_txid dallo stato,
-            # lo stop reale resta vivo su Kraken (e continua a tenere
-            # vincolato tutto il saldo) mentre noi crediamo che non ci sia
-            # piu' nulla: la vendita fallisce sempre per fondi insufficienti
-            # e lo stato non racconta piu' quello che e' vero sul server.
-            cancel_ok = cancel_order(server_txid)
-            if cancel_ok:
+            # cancel_order() ora ritorna tre stati, non solo un bool: se
+            # l'ordine e' gia' sparito da solo (ALREADY_GONE — riempito,
+            # scaduto, cancellato altrove) equivale a successo, va trattato
+            # come "non c'e' piu' nulla da cancellare" e si procede. Solo
+            # un fallimento transitorio VERO (FAILED — timeout/rate limit/
+            # nonce) significa "l'ordine potrebbe essere ancora vivo",
+            # quindi solo in quel caso non tentiamo la vendita.
+            cancel_status = cancel_order(server_txid)
+            if cancel_status != CANCEL_FAILED:
                 pos["server_sl_txid"] = None
                 pos["server_sl_price"] = None
-                # Il saldo che lo stop teneva vincolato non si libera sempre
-                # nello stesso istante in cui la cancellazione viene
-                # accettata: una vendita immediata sullo stesso volume puo'
-                # trovare ancora "occupato" quello che stiamo per rivendicare.
-                time.sleep(1.5)
-        if not cancel_ok:
+                if cancel_status == CANCEL_OK:
+                    # Il saldo che lo stop teneva vincolato non si libera
+                    # sempre nello stesso istante in cui la cancellazione
+                    # viene accettata: una vendita immediata sullo stesso
+                    # volume puo' trovare ancora "occupato" quello che
+                    # stiamo per rivendicare. Se era gia' ALREADY_GONE non
+                    # c'e' nessun vincolo da aspettare che si liberi.
+                    time.sleep(1.5)
+        if cancel_status == CANCEL_FAILED:
             telegram_send(
                 f"⚠️ {base}: impossibile cancellare lo stop reale esistente "
-                f"({server_txid}) — non tento la vendita, il saldo resta "
-                f"vincolato li'. Lo stop e' comunque ancora attivo e protegge "
-                f"la posizione. Riprovo la cancellazione al prossimo run."
+                f"({server_txid}, errore transitorio) — non tento la vendita, "
+                f"il saldo potrebbe restare vincolato li'. Riprovo al prossimo run."
             )
             return
         try:
@@ -865,6 +876,15 @@ def get_all_eur_pairs():
 
 
 def get_ticker_batch(pair_names):
+    """Ticker in batch da CONFIG['TICKER_BATCH_SIZE'] pair per richiesta.
+    ATTENZIONE (verificato contro l'API reale): se anche un solo pair nel
+    batch e' sconosciuto/delistato, Kraken fa fallire l'INTERA richiesta —
+    nessun risultato parziale per i pair ancora validi nello stesso batch.
+    Va bene per la scansione di mercato (i pair vengono presi da
+    AssetPairs, sempre validi in quel momento), ma NON va usato per le
+    posizioni aperte: un solo pair rotto azzererebbe il monitoraggio di
+    tutte le altre. Per quelle vedi get_ticker_individually.
+    """
     all_tickers = {}
     names = list(pair_names)
     batch = CONFIG["TICKER_BATCH_SIZE"]
@@ -880,10 +900,41 @@ def get_ticker_batch(pair_names):
             data = r.json()
             if data.get("result"):
                 all_tickers.update(data["result"])
+            elif data.get("error"):
+                print(f"[WARN] Ticker batch {i}: Kraken error {data['error']}")
         except Exception as e:
             print(f"[WARN] Ticker batch {i}: {e}")
         time.sleep(0.3)
     return all_tickers
+
+
+def get_ticker_individually(pair_names):
+    """Come get_ticker_batch ma un pair per richiesta: piu' lento ma molto
+    piu' resiliente. Usato solo per le posizioni aperte, che sono poche
+    (2-6), quindi il costo extra e' trascurabile — e una coin delistata o
+    rinominata (il caso piu' probabile proprio tra le micro-cap che questo
+    bot compra) non deve azzerare il monitoraggio di TUTTO il resto del
+    portafoglio: SL/TP/trailing/verifica saldo reale sulle altre posizioni
+    devono continuare a funzionare anche se una singola coin e' rotta.
+    """
+    tickers = {}
+    for pair in pair_names:
+        try:
+            r = requests.get(f"{KRAKEN_PUBLIC}/Ticker",
+                             params={"pair": pair}, timeout=20)
+            if r.status_code == 429:
+                print(f"[RATE LIMIT] Kraken 429 su Ticker {pair}")
+                continue
+            r.raise_for_status()
+            data = r.json()
+            if data.get("result"):
+                tickers.update(data["result"])
+            else:
+                print(f"[WARN] Ticker {pair}: Kraken error {data.get('error')}")
+        except Exception as e:
+            print(f"[WARN] Ticker {pair}: {e}")
+        time.sleep(0.2)
+    return tickers
 
 
 def trading_enabled():
@@ -1013,13 +1064,32 @@ def place_stop_order_safe(pair, volume, stop_price, price_decimals):
         raise
 
 
+# Stati di ritorno di cancel_order(): un fallimento puo' voler dire due
+# cose opposte, e trattarle allo stesso modo e' esattamente il bug che ha
+# causato l'incidente PUMP (in una direzione) e il suo fix originale (nella
+# direzione opposta, vedi CANCEL_ALREADY_GONE sotto).
+CANCEL_OK = "CANCELLED"            # cancellazione riuscita adesso
+CANCEL_ALREADY_GONE = "ALREADY_GONE"  # l'ordine non esiste piu' (gia' cancellato/riempito/scaduto altrove) — equivale a successo: non c'e' piu' nulla da cancellare
+CANCEL_FAILED = "FAILED"           # fallimento transitorio reale (timeout/429/nonce/manutenzione) — l'ordine potrebbe essere ancora vivo
+
+
 def cancel_order(txid):
+    """Cancella un ordine sul server Kraken. Ritorna uno dei tre stati
+    sopra invece di un semplice bool: un CancelOrder che fallisce con
+    'Unknown order'/'Invalid order' significa che l'ordine e' gia' sparito
+    (eseguito, cancellato altrove, scaduto) — se lo trattiamo come
+    'fallito, quindi forse ancora vivo' il codice puo' bloccarsi per
+    sempre convinto che una protezione esista quando non c'e' piu' nulla
+    da proteggere ne' da vendere."""
     try:
         kraken_private("/0/private/CancelOrder", {"txid": txid})
-        return True
+        return CANCEL_OK
     except Exception as e:
+        msg = str(e)
+        if "Unknown order" in msg or "Invalid order" in msg:
+            return CANCEL_ALREADY_GONE
         print(f"[WARN] CancelOrder {txid}: {e}")
-        return False
+        return CANCEL_FAILED
 
 
 def get_balances():
@@ -1300,10 +1370,14 @@ def check_sells(positions, tickers, state, params, balances):
                 # manuale sul sito Kraken), lo stop resta vivo sul server
                 # senza piu' una posizione dietro — orfano, stesso rischio
                 # gia' corretto in force_close_one. Se invece e' stato lui a
-                # chiudere, e' gia' un ordine concluso e cancel_order() e'
-                # un no-op innocuo.
-                if server_txid:
-                    cancel_order(server_txid)
+                # chiudere, cancel_order ritorna ALREADY_GONE (l'ordine e'
+                # gia' concluso), che va bene cosi'.
+                if server_txid and cancel_order(server_txid) == CANCEL_FAILED:
+                    telegram_send(
+                        f"⚠️ {base}: rimosso dal tracciamento ma la cancellazione "
+                        f"dello stop reale ({server_txid}) potrebbe non essere "
+                        f"andata a buon fine — verifica manualmente su Kraken."
+                    )
                 del positions[base]
                 check_kill_switch(state)
                 continue
@@ -1391,31 +1465,59 @@ def check_sells(positions, tickers, state, params, balances):
                     old_stop is not None and desired_stop > old_stop * 1.003
                 )
                 if needs_update:
+                    cancel_status = CANCEL_OK
                     if old_txid:
-                        cancel_order(old_txid)
-                    # Usa il saldo reale se disponibile, non il volume
-                    # nominale registrato all'acquisto: se la fee e' stata
-                    # trattenuta nell'asset invece che in EUR, il volume
-                    # davvero posseduto e' leggermente inferiore, e Kraken
-                    # rifiuta un ordine per piu' di quanto c'e' realmente
-                    # ("Insufficient funds") anche se la posizione e' reale.
-                    stop_vol = pos["volume"]
-                    asset_code_sl = pos.get("asset_code")
-                    if balances is not None and asset_code_sl and asset_code_sl in balances:
-                        stop_vol = min(stop_vol, balances[asset_code_sl])
-                    # Idem check_buys: il saldo reale non e' allineato ai
-                    # decimali di volume ammessi dal pair.
-                    stop_vol = round_vol(stop_vol, pos.get("lot_decimals", 8))
-                    try:
-                        r, used_dec = place_stop_order_safe(
-                            pos["pair"], stop_vol, desired_stop,
-                            pos.get("pair_decimals", 8)
-                        )
-                        pos["server_sl_txid"] = r.get("txid", [None])[0]
-                        pos["server_sl_price"] = desired_stop
-                        pos["pair_decimals"] = used_dec
-                    except Exception as e:
-                        print(f"[WARN] Piazzamento/aggiornamento stop server {base}: {e}")
+                        cancel_status = cancel_order(old_txid)
+                    if cancel_status == CANCEL_FAILED:
+                        # L'ordine vecchio potrebbe essere ancora vivo: NON
+                        # piazzare un secondo stop sopra, altrimenti restano
+                        # due stop-loss vivi sulla stessa posizione — uno
+                        # dei due orfano, che tiene vincolato il saldo e
+                        # blocca qualunque vendita futura (causa esatta
+                        # dell'incidente PUMP). Lasciamo lo stato com'e' e
+                        # riproviamo la cancellazione al prossimo run.
+                        print(f"[WARN] Impossibile cancellare lo stop precedente "
+                              f"{base} ({old_txid}), salto l'aggiornamento questo run")
+                    else:
+                        # ALREADY_GONE o CANCELLED: non c'e' piu' nulla di
+                        # vivo dietro old_txid, sicuro piazzare il nuovo.
+                        # Usa il saldo reale se disponibile, non il volume
+                        # nominale registrato all'acquisto: se la fee e'
+                        # stata trattenuta nell'asset invece che in EUR, il
+                        # volume davvero posseduto e' leggermente inferiore,
+                        # e Kraken rifiuta un ordine per piu' di quanto c'e'
+                        # realmente ("Insufficient funds") anche se la
+                        # posizione e' reale.
+                        stop_vol = pos["volume"]
+                        asset_code_sl = pos.get("asset_code")
+                        if balances is not None and asset_code_sl and asset_code_sl in balances:
+                            stop_vol = min(stop_vol, balances[asset_code_sl])
+                        # Idem check_buys: il saldo reale non e' allineato ai
+                        # decimali di volume ammessi dal pair.
+                        stop_vol = round_vol(stop_vol, pos.get("lot_decimals", 8))
+                        try:
+                            r, used_dec = place_stop_order_safe(
+                                pos["pair"], stop_vol, desired_stop,
+                                pos.get("pair_decimals", 8)
+                            )
+                            pos["server_sl_txid"] = r.get("txid", [None])[0]
+                            pos["server_sl_price"] = desired_stop
+                            pos["pair_decimals"] = used_dec
+                        except Exception as e:
+                            # Il vecchio stop non c'e' piu' (cancellato o
+                            # gia' sparito) ma il nuovo non e' stato
+                            # piazzato: la posizione e' SENZA protezione
+                            # reale adesso. Lo stato deve dirlo chiaramente
+                            # invece di lasciare un txid vecchio che non
+                            # protegge piu' nulla, e l'utente va avvisato —
+                            # prima c'era solo un print, invisibile.
+                            pos["server_sl_txid"] = None
+                            pos["server_sl_price"] = None
+                            print(f"[WARN] Piazzamento/aggiornamento stop server {base}: {e}")
+                            telegram_send(
+                                f"⚠️ {base}: stop reale non aggiornato/ripiazzato ({e}). "
+                                f"Posizione senza protezione reale sul server fino al prossimo run."
+                            )
             continue
 
         sell_vol = pos["volume"]
@@ -1431,28 +1533,28 @@ def check_sells(positions, tickers, state, params, balances):
             # (il nostro market e lo stop sul server), rischio di vendere
             # due volte o che il secondo ordine fallisca a vuoto.
             server_txid = pos.get("server_sl_txid")
-            cancel_ok = True
+            cancel_status = CANCEL_OK
             if server_txid:
-                # cancel_order() puo' fallire senza sollevare eccezione: se
-                # non controlliamo il risultato e cancelliamo comunque
-                # server_sl_txid dallo stato, lo stop reale resta vivo su
-                # Kraken (e tiene vincolato tutto il saldo) mentre crediamo
-                # non ci sia piu' nulla — la vendita fallisce sempre per
-                # fondi insufficienti e lo stato mente su cosa c'e' davvero.
-                cancel_ok = cancel_order(server_txid)
-                if cancel_ok:
+                # cancel_order() ritorna tre stati: ALREADY_GONE (l'ordine
+                # non c'e' piu', va bene procedere) va trattato come
+                # successo, non come "forse ancora vivo" — altrimenti la
+                # vendita resta bloccata per sempre convinta che uno stop
+                # ormai inesistente la protegga ancora. Solo FAILED
+                # (fallimento transitorio vero) deve fermarci.
+                cancel_status = cancel_order(server_txid)
+                if cancel_status != CANCEL_FAILED:
                     pos["server_sl_txid"] = None
                     pos["server_sl_price"] = None
-                    # Vedi sell_with_balance_retry/force_close_one: il saldo
-                    # vincolato dallo stop appena cancellato non si libera
-                    # sempre nello stesso istante.
-                    time.sleep(1.5)
-            if not cancel_ok:
+                    if cancel_status == CANCEL_OK:
+                        # Vedi sell_with_balance_retry/force_close_one: il
+                        # saldo vincolato dallo stop appena cancellato non
+                        # si libera sempre nello stesso istante.
+                        time.sleep(1.5)
+            if cancel_status == CANCEL_FAILED:
                 telegram_send(
                     f"⚠️ {base}: impossibile cancellare lo stop reale esistente "
-                    f"({server_txid}) — non tento la vendita, il saldo resta "
-                    f"vincolato li'. Lo stop e' comunque ancora attivo e "
-                    f"protegge la posizione. Riprovo al prossimo run."
+                    f"({server_txid}, errore transitorio) — non tento la vendita, "
+                    f"il saldo potrebbe restare vincolato li'. Riprovo al prossimo run."
                 )
                 continue
             try:
@@ -1866,8 +1968,12 @@ def _run_body(state):
     # niente verifica saldo reale) solo perche' la sua coin non era in
     # cima alla lista di scansione. Il capitale gia' investito viene prima
     # della ricerca di nuove opportunita'.
+    # Un pair per richiesta, non in batch: un batch unico fallisce per
+    # intero se anche solo una coin e' delistata/rinominata (verificato
+    # contro l'API), il che azzererebbe il monitoraggio di TUTTE le
+    # posizioni aperte per quel run, non solo di quella rotta.
     position_pairs = [pos["pair"] for pos in positions.values() if pos.get("pair")]
-    tickers = get_ticker_batch(position_pairs) if position_pairs else {}
+    tickers = get_ticker_individually(position_pairs) if position_pairs else {}
 
     scan_pairs = [p for p in all_pairs.keys() if p not in tickers]
     tickers.update(get_ticker_batch(scan_pairs))
