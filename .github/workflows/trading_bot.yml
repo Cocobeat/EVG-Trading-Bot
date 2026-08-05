@@ -71,9 +71,23 @@ jobs:
           for i in 1 2 3 4 5; do
             git fetch origin main
             git show origin/main:state.json > state.remote.json
-            python3 merge_state.py state.base.json state.local.json state.remote.json state.json
+            python3 merge_state.py state.base.json state.local.json state.remote.json state.merged.json
 
-            git reset --soft origin/main
+            # git reset --hard (non --soft) e' l'unico modo sicuro di
+            # ripartire dalla punta VERA del branch remoto: --soft sposta
+            # solo HEAD e lascia index e working tree fermi al checkout
+            # iniziale di questo run. Se nel frattempo qualcuno ha pushato
+            # un fix a bot.py, il commit di merge costruito sopra a quello
+            # stato vecchio lo revertirebbe silenziosamente al push
+            # successivo — un bug reale, verificato, non teorico: un fix a
+            # bot.py pushato mentre un run e' in corso puo' sparire di
+            # nuovo entro un minuto senza nessun errore visibile.
+            # --hard riallinea TUTTO (incluso bot.py) all'ultimo main
+            # remoto; poi si rimette dentro solo lo state.json appena
+            # mergiato, cosi' l'unica cosa che questo step puo' cambiare e'
+            # davvero solo quella.
+            git reset --hard origin/main
+            cp state.merged.json state.json
             git add state.json
             git commit -m "Aggiorna stato posizioni (merge automatico) [skip ci]"
 
