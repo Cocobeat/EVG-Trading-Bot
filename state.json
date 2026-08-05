@@ -34,7 +34,9 @@
       "server_sl_price": 0.0069643199999999995,
       "pair_decimals": 6,
       "lot_decimals": 5,
-      "entry_fee_eur": 0.1305
+      "entry_fee_eur": 0.1305,
+      "server_tp_txid": "OGZOX4-I7LUB-IU3CUT",
+      "server_tp_price": 0.026907599999999997
     },
     "AI": {
       "pair": "AIEUR",
@@ -70,7 +72,9 @@
       "server_sl_price": 0.017283200000000002,
       "pair_decimals": 5,
       "lot_decimals": 5,
-      "entry_fee_eur": 0.13158
+      "entry_fee_eur": 0.13158,
+      "server_tp_txid": "OKSMU3-GQ2EI-MWG6K5",
+      "server_tp_price": 0.066776
     }
   },
   "last_heartbeat_date": "2026-08-05",
@@ -81,9 +85,9 @@
   "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {
-    "PRCL": 27.965069816666663
+    "PRCL": 26.86314433333333
   },
-  "last_run_time": "2026-08-05T18:01:25.206700+00:00",
+  "last_run_time": "2026-08-05T18:02:31.322229+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
