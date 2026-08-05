@@ -561,6 +561,27 @@ def force_close_one(state, base, balances=_UNSET):
     order_note = ""
     exit_fee_eur = 0.0
     if trading_enabled():
+        # Posizioni aperte prima di questo aggiornamento hanno ancora un
+        # vecchio stop-loss reale sul server (server_sl_txid), campo che il
+        # resto del codice nuovo non gestisce piu'. Se resta vivo tiene
+        # bloccato il saldo e fa fallire la vendita con "Insufficient
+        # funds" — cancellalo prima di procedere (vedi stessa logica in
+        # check_sells).
+        legacy_txid = pos.get("server_sl_txid")
+        if legacy_txid:
+            legacy_status = cancel_order(legacy_txid)
+            if legacy_status != CANCEL_FAILED:
+                pos["server_sl_txid"] = None
+                pos["server_sl_price"] = None
+                if legacy_status == CANCEL_OK:
+                    time.sleep(1.5)
+            else:
+                telegram_send(
+                    f"⚠️ {base}: impossibile cancellare il vecchio stop-loss esistente "
+                    f"({legacy_txid}, errore transitorio) — non tento la vendita, "
+                    f"il saldo potrebbe restare vincolato li'. Riprova tra poco."
+                )
+                return
         asset_code = pos.get("asset_code")
         if balances is None:
             # Balance API in errore/timeout anche dopo il refetch: non
@@ -1247,6 +1268,47 @@ def check_sells(positions, tickers, state, params, balances):
         pos["last_price"] = price
         entry = pos["entry_price"]
         chg = (price - entry) / entry * 100
+
+        # Migrazione posizioni aperte PRIMA di questo aggiornamento di
+        # strategia: avevano un vero stop-loss piazzato sul server
+        # (server_sl_txid), un campo che il codice nuovo non legge piu' da
+        # nessuna parte. Se resta li' vivo, tiene bloccato il saldo (Kraken
+        # lo riserva per l'ordine aperto) e fa fallire con "Insufficient
+        # funds" sia il piazzamento del nuovo take-profit sia una vendita
+        # manuale — lo cancelliamo qui, una tantum, prima di qualunque altra
+        # azione su questa posizione. Idempotente: una volta cancellato il
+        # campo viene azzerato, i run successivi non trovano piu' nulla da
+        # fare qui.
+        legacy_txid = pos.get("server_sl_txid")
+        if legacy_txid and trading_enabled():
+            legacy_status = cancel_order(legacy_txid)
+            if legacy_status != CANCEL_FAILED:
+                pos["server_sl_txid"] = None
+                pos["server_sl_price"] = None
+                if legacy_status == CANCEL_OK:
+                    time.sleep(1.5)
+            else:
+                print(f"[WARN] {base}: impossibile cancellare il vecchio stop-loss "
+                      f"{legacy_txid}, riprovo al prossimo run")
+
+        # Stessa migrazione, lato prezzi: una posizione vecchia porta ancora
+        # il tp_price/sl_price della strategia pump (es. target +300%, mai
+        # raggiungibile davvero — era solo un backstop, il trailing decideva
+        # la vendita vera). "catastrophic_price" esiste SOLO nello schema
+        # nuovo: se manca, ricalcoliamo target e rete di sicurezza da zero
+        # sull'entry_price originale (invariato) usando i parametri della
+        # nuova strategia attualmente attivi, invece di ereditare un target
+        # che con questa logica non si riempirebbe mai.
+        if "catastrophic_price" not in pos:
+            pos["tp_pct"] = params["tp_pct"]
+            pos["tp_price"] = entry * (1 + params["tp_pct"] / 100)
+            pos["catastrophic_pct"] = params["catastrophic_pct"]
+            pos["catastrophic_price"] = entry * (1 - params["catastrophic_pct"] / 100)
+            pos["strategy"] = "dip_scalp"
+            pos.pop("sl_price", None)
+            print(f"  Migrata {base} alla nuova strategia: target {fp(pos['tp_price'])} "
+                  f"(+{pos['tp_pct']:.1f}%), catastrofico {fp(pos['catastrophic_price'])} "
+                  f"(-{pos['catastrophic_pct']:.0f}%)")
 
         # Il saldo reale e' la fonte di verita': se e' gia' a zero (o quasi),
         # l'ordine take-profit piazzato all'acquisto si e' riempito da solo
