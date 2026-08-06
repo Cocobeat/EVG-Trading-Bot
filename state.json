@@ -1,23 +1,5 @@
 {
   "open_positions": {
-    "OP": {
-      "pair": "OPEUR",
-      "asset_code": "OP",
-      "entry_price": 0.0766,
-      "volume": 508.0263,
-      "entry_time": "2026-08-05T18:21:08.817689+00:00",
-      "last_price": 0.0765,
-      "tp_pct": 2.7,
-      "tp_price": 0.0786682,
-      "catastrophic_pct": 32.0,
-      "catastrophic_price": 0.052087999999999995,
-      "strategy": "dip_scalp",
-      "server_tp_txid": "OP23DM-LU4FV-VY2T64",
-      "server_tp_price": 0.0786682,
-      "pair_decimals": 4,
-      "lot_decimals": 5,
-      "entry_fee_eur": 0.31172494
-    },
     "DOT": {
       "pair": "DOTEUR",
       "asset_code": "DOT",
@@ -35,6 +17,24 @@
       "pair_decimals": 4,
       "lot_decimals": 8,
       "entry_fee_eur": 0.29994
+    },
+    "OP": {
+      "pair": "OPEUR",
+      "asset_code": "OP",
+      "entry_price": 0.0766,
+      "volume": 508.0263,
+      "entry_time": "2026-08-05T18:21:08.817689+00:00",
+      "last_price": 0.0765,
+      "tp_pct": 2.7,
+      "tp_price": 0.0786682,
+      "catastrophic_pct": 32.0,
+      "catastrophic_price": 0.052087999999999995,
+      "strategy": "dip_scalp",
+      "server_tp_txid": "OP23DM-LU4FV-VY2T64",
+      "server_tp_price": 0.0786682,
+      "pair_decimals": 4,
+      "lot_decimals": 5,
+      "entry_fee_eur": 0.31172494
     }
   },
   "last_heartbeat_date": "2026-08-06",
@@ -45,7 +45,7 @@
   "last_fgi": 25,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-06T00:49:22.246175+00:00",
+  "last_run_time": "2026-08-06T00:49:48.251115+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
