@@ -37,15 +37,15 @@
       "entry_fee_eur": 0.29994
     }
   },
-  "last_heartbeat_date": "2026-08-09",
+  "last_heartbeat_date": "2026-08-10",
   "cumulative_pnl_eur": -1.1600605909099961,
   "trading_paused": false,
   "telegram_update_offset": 64929864,
   "current_regime": "BEAR_DEFENSIVE",
-  "last_fgi": 31,
+  "last_fgi": 30,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-09T23:59:24.587265+00:00",
+  "last_run_time": "2026-08-10T00:01:13.874169+00:00",
   "trade_stats": {
     "auto_wins": 1,
     "auto_losses": 2,
