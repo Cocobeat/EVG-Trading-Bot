@@ -30,8 +30,8 @@
       "catastrophic_pct": 32.0,
       "catastrophic_price": 0.00464032,
       "strategy": "dip_scalp",
-      "server_tp_txid": null,
-      "server_tp_price": null,
+      "server_tp_txid": "OMMGIN-63KVF-ASOMBD",
+      "server_tp_price": 0.007008248,
       "pair_decimals": 6,
       "lot_decimals": 5,
       "entry_fee_eur": 0.30434
@@ -45,7 +45,7 @@
   "last_fgi": 30,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-10T06:28:28.844508+00:00",
+  "last_run_time": "2026-08-10T06:29:21.251299+00:00",
   "trade_stats": {
     "auto_wins": 2,
     "auto_losses": 2,
