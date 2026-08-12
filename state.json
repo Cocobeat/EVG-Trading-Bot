@@ -24,7 +24,7 @@
       "entry_price": 0.7369,
       "volume": 50.87109585,
       "entry_time": "2026-08-05T18:21:38.920711+00:00",
-      "last_price": 0.6839,
+      "last_price": 0.6841,
       "tp_pct": 2.7,
       "tp_price": 0.7567963,
       "catastrophic_pct": 32.0,
@@ -37,15 +37,15 @@
       "entry_fee_eur": 0.29994
     }
   },
-  "last_heartbeat_date": "2026-08-11",
+  "last_heartbeat_date": "2026-08-12",
   "cumulative_pnl_eur": -0.6156596109099951,
   "trading_paused": false,
   "telegram_update_offset": 64929867,
   "current_regime": "BEAR_DEFENSIVE",
-  "last_fgi": 29,
+  "last_fgi": 27,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-11T23:59:22.501333+00:00",
+  "last_run_time": "2026-08-12T00:01:21.777695+00:00",
   "trade_stats": {
     "auto_wins": 2,
     "auto_losses": 2,
