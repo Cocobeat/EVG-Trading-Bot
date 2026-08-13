@@ -1,23 +1,5 @@
 {
   "open_positions": {
-    "SKR": {
-      "pair": "SKREUR",
-      "asset_code": "SKR",
-      "entry_price": 0.006824,
-      "volume": 5574.82824,
-      "entry_time": "2026-08-10T06:28:39.665093+00:00",
-      "last_price": 0.006173,
-      "tp_pct": 2.7,
-      "tp_price": 0.007008248,
-      "catastrophic_pct": 32.0,
-      "catastrophic_price": 0.00464032,
-      "strategy": "dip_scalp",
-      "server_tp_txid": "OMMGIN-63KVF-ASOMBD",
-      "server_tp_price": 0.007008248,
-      "pair_decimals": 6,
-      "lot_decimals": 5,
-      "entry_fee_eur": 0.30434
-    },
     "DOT": {
       "pair": "DOTEUR",
       "asset_code": "DOT",
@@ -45,7 +27,7 @@
   "last_fgi": 29,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-13T13:37:24.464279+00:00",
+  "last_run_time": "2026-08-13T13:38:28.278507+00:00",
   "trade_stats": {
     "auto_wins": 2,
     "auto_losses": 2,
