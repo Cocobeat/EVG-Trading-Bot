@@ -5,10 +5,10 @@
   "trading_paused": true,
   "telegram_update_offset": 64929868,
   "current_regime": "BEAR_DEFENSIVE",
-  "last_fgi": 46,
+  "last_fgi": null,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-08-19T10:09:20.320706+00:00",
+  "last_run_time": "2026-08-19T10:10:34.513024+00:00",
   "trade_stats": {
     "auto_wins": 2,
     "auto_losses": 2,
