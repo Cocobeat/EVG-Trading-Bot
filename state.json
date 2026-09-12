@@ -1,14 +1,14 @@
 {
   "open_positions": {},
-  "last_heartbeat_date": "2026-09-11",
+  "last_heartbeat_date": "2026-09-12",
   "cumulative_pnl_eur": -0.6156596109099951,
   "trading_paused": true,
   "telegram_update_offset": 64929868,
   "current_regime": "BEAR_DEFENSIVE",
-  "last_fgi": 56,
+  "last_fgi": 63,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-09-11T23:23:12.830639+00:00",
+  "last_run_time": "2026-09-12T01:16:17.508223+00:00",
   "trade_stats": {
     "auto_wins": 2,
     "auto_losses": 2,
