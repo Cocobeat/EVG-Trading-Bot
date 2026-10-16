@@ -4,11 +4,11 @@
   "cumulative_pnl_eur": -0.6156596109099951,
   "trading_paused": true,
   "telegram_update_offset": 64929868,
-  "current_regime": "BEAR_DEFENSIVE",
+  "current_regime": "BULL_AGGRESSIVE",
   "last_fgi": 63,
   "user_profile": "aggressivo",
   "cooldowns": {},
-  "last_run_time": "2026-10-16T09:57:36.564340+00:00",
+  "last_run_time": "2026-10-16T14:26:57.402699+00:00",
   "trade_stats": {
     "auto_wins": 2,
     "auto_losses": 2,
